@@ -1,0 +1,74 @@
+import { api } from './api';
+import { useAuth } from '@/stores/auth';
+import type { User } from '@/types';
+
+type AuthResponse = { user: User; token: string };
+
+export async function loginWithEmail(email: string, password: string) {
+  const res = await api<AuthResponse>('/auth/login', {
+    method: 'POST',
+    body: { email, password },
+  });
+  useAuth.getState().setAuth(res.user, res.token);
+  return res;
+}
+
+export async function registerWithEmail(input: {
+  name?: string;
+  email: string;
+  password: string;
+  phone?: string;
+  role?: 'customer' | 'shop' | 'delivery';
+}) {
+  const res = await api<AuthResponse>('/auth/register', {
+    method: 'POST',
+    body: input,
+  });
+  useAuth.getState().setAuth(res.user, res.token);
+  return res;
+}
+
+export async function sendOtp(phone: string) {
+  return api<{ phone: string; expiresInSeconds: number }>('/auth/otp/send', {
+    method: 'POST',
+    body: { phone },
+  });
+}
+
+export async function verifyOtp(input: {
+  phone: string;
+  code: string;
+  name?: string;
+  roleHint?: 'customer' | 'shop' | 'delivery';
+}) {
+  const res = await api<AuthResponse>('/auth/otp/verify', {
+    method: 'POST',
+    body: input,
+  });
+  useAuth.getState().setAuth(res.user, res.token);
+  return res;
+}
+
+export async function refreshMe() {
+  const token = useAuth.getState().token;
+  if (!token) return null;
+  try {
+    const { user } = await api<{ user: User }>('/auth/me', { token });
+    // Preserve token, update user
+    useAuth.setState({ user });
+    return user;
+  } catch {
+    useAuth.getState().clear();
+    return null;
+  }
+}
+
+export async function logout() {
+  const token = useAuth.getState().token;
+  try {
+    if (token) await api('/auth/logout', { method: 'POST', token });
+  } catch {
+    // Best effort
+  }
+  useAuth.getState().clear();
+}
