@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Loader2, LogOut, Package, Store, ListOrdered, Power } from 'lucide-react';
+import { Loader2, LogOut, Package, Store, ListOrdered } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/stores/auth';
@@ -16,6 +16,7 @@ import type { Shop } from '@/lib/shops';
 import { ShopWizard } from '@/components/shop/ShopWizard';
 import { StorefrontTab } from '@/components/shop/StorefrontTab';
 import { ProductsTab } from '@/components/shop/ProductsTab';
+import { OrdersTab } from '@/components/shop/OrdersTab';
 
 type Section = 'storefront' | 'products' | 'orders';
 
@@ -127,7 +128,7 @@ export default function ShopDashboard() {
             />
           )}
           {section === 'products' && <ProductsTab shopId={shop._id} />}
-          {section === 'orders' && <OrdersPlaceholder />}
+          {section === 'orders' && <OrdersTab shopId={shop._id} />}
         </div>
       </main>
     </div>
@@ -270,22 +271,8 @@ function SectionNav({ current, onChange }: NavProps) {
 }
 
 // =============================================================================
-// Placeholders
+// Loader
 // =============================================================================
-
-function OrdersPlaceholder() {
-  return (
-    <div className="rounded-lg border border-dashed p-10 text-center space-y-3">
-      <Power className="h-8 w-8 text-muted-foreground mx-auto" />
-      <h3 className="font-semibold">Live orders arrive here in Phase 4b</h3>
-      <p className="text-sm text-muted-foreground max-w-md mx-auto">
-        Once 4b ships, new orders will pop in live via Socket.IO. You&apos;ll be able to accept,
-        prep, mark ready for pickup, and status updates will broadcast to the customer&apos;s
-        tracking page.
-      </p>
-    </div>
-  );
-}
 
 function FullPageLoader({ label }: { label: string }) {
   return (
