@@ -12,6 +12,7 @@ import {
   Wallet,
   Package,
   TrendingUp,
+  Truck,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -29,8 +30,17 @@ import {
   type AvailableJob,
   type MyJob,
 } from '@/lib/delivery';
+import {
+  fetchTransportJobs,
+  fetchMyTransportJobs,
+  type AvailableTransportJob,
+  type TransportOrder,
+} from '@/lib/transport';
 import { JobFeed } from '@/components/delivery/JobFeed';
 import { MyJobsList } from '@/components/delivery/MyJobsList';
+import { TransportJobFeed } from '@/components/delivery/TransportJobFeed';
+import { MyTransportJobsList } from '@/components/delivery/MyTransportJobsList';
+import { VehicleTypeSelector } from '@/components/delivery/VehicleTypeSelector';
 import { useLiveLocation } from '@/lib/useLiveLocation';
 
 type Coords = { lat: number; lng: number };
@@ -117,6 +127,12 @@ function DeliveryDashboardInner({ profile, setProfile, userName, onLogout }: Inn
   const [myJobs, setMyJobs] = useState<MyJob[] | null>(null);
   const [feedError, setFeedError] = useState<string | null>(null);
 
+  // 6b.2: transport-side state.
+  const [transportJobs, setTransportJobs] = useState<AvailableTransportJob[] | null>(null);
+  const [myTransportJobs, setMyTransportJobs] = useState<TransportOrder[] | null>(null);
+  // Which feed the partner is currently looking at: grocery pickups or transport.
+  const [feedTab, setFeedTab] = useState<'grocery' | 'transport'>('grocery');
+
   // ---- one-shot GPS fix on mount ----
   useEffect(() => {
     if (!navigator.geolocation) {
@@ -159,6 +175,20 @@ function DeliveryDashboardInner({ profile, setProfile, userName, onLogout }: Inn
     loadMyJobs();
   }, [loadMyJobs]);
 
+  // 6b.2: transport — my active assigned transport jobs.
+  const loadMyTransportJobs = useCallback(async () => {
+    try {
+      const r = await fetchMyTransportJobs();
+      setMyTransportJobs(r.jobs);
+    } catch {
+      setMyTransportJobs([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadMyTransportJobs();
+  }, [loadMyTransportJobs]);
+
   // ---- load the available-jobs feed (needs GPS + online) ----
   const loadJobs = useCallback(async () => {
     if (!coords || !profile.available) {
@@ -178,21 +208,54 @@ function DeliveryDashboardInner({ profile, setProfile, userName, onLogout }: Inn
     loadJobs();
   }, [loadJobs]);
 
+  // 6b.2: transport feed. Needs GPS + online + a vehicleType set.
+  const loadTransportJobs = useCallback(async () => {
+    if (!coords || !profile.available || !profile.vehicleType) {
+      setTransportJobs(null);
+      return;
+    }
+    try {
+      const r = await fetchTransportJobs(coords.lng, coords.lat, radiusKm);
+      setTransportJobs(r.jobs);
+    } catch (err) {
+      // 400 "Set your vehicle type" comes back here — keep null so the
+      // TransportJobFeed renders its own prompt instead of an error banner.
+      if (err instanceof ApiError && err.status === 400) {
+        setTransportJobs(null);
+        return;
+      }
+      setFeedError(err instanceof ApiError ? err.message : 'Could not load transport jobs.');
+    }
+  }, [coords, profile.available, profile.vehicleType, radiusKm]);
+
+  useEffect(() => {
+    loadTransportJobs();
+  }, [loadTransportJobs]);
+
   // ---- socket: a job got taken by someone else → drop it from the feed ----
   useEffect(() => {
     const socket = getSocket(token);
     if (!socket) return;
 
-    function onJobTaken(payload: { orderId: string }) {
-      setJobs((prev) => (prev ? prev.filter((j) => j.orderId !== payload.orderId) : prev));
+    function onJobTaken(payload: { orderId: string; kind?: 'transport' }) {
+      if (payload.kind === 'transport') {
+        setTransportJobs((prev) =>
+          prev ? prev.filter((j) => j._id !== payload.orderId) : prev
+        );
+      } else {
+        setJobs((prev) => (prev ? prev.filter((j) => j.orderId !== payload.orderId) : prev));
+      }
     }
-    // When a shop marks something ready, a fresh pickup may now be in range.
+    // When a shop marks something ready or a new transport booking lands,
+    // a fresh job may now be in range.
     function onStatusUpdate() {
       loadJobs();
+      loadTransportJobs();
     }
-    // 5b: auto-assigner gave us a job — refresh my-jobs so it appears.
-    function onJobAssigned() {
-      loadMyJobs();
+    // Auto-assigner gave us a job — refresh both my-jobs lists so it appears.
+    function onJobAssigned(payload: { kind?: 'transport' }) {
+      if (payload?.kind === 'transport') loadMyTransportJobs();
+      else loadMyJobs();
     }
 
     socket.on('job:taken', onJobTaken);
@@ -203,12 +266,15 @@ function DeliveryDashboardInner({ profile, setProfile, userName, onLogout }: Inn
       socket.off('order:status_update', onStatusUpdate);
       socket.off('job:assigned', onJobAssigned);
     };
-  }, [token, loadJobs, loadMyJobs]);
+  }, [token, loadJobs, loadMyJobs, loadTransportJobs, loadMyTransportJobs]);
 
   // ---- 5b: live GPS streaming while online ----
   // Watches position, throttles emits, fans out to anyone tracking the orders
-  // this partner is currently delivering.
-  const activeOrderIds = (myJobs || []).map((j) => j._id);
+  // this partner is currently delivering — BOTH grocery and transport.
+  const activeOrderIds = [
+    ...(myJobs || []).map((j) => j._id),
+    ...(myTransportJobs || []).map((j) => j._id),
+  ];
   const { position: partnerPosition } = useLiveLocation({
     enabled: profile.available,
     orderIds: activeOrderIds,
@@ -275,6 +341,11 @@ function DeliveryDashboardInner({ profile, setProfile, userName, onLogout }: Inn
             {online ? 'ONLINE' : 'OFFLINE'}
           </button>
 
+          <VehicleTypeSelector
+            current={profile.vehicleType}
+            onChanged={(p) => setProfile(p)}
+          />
+
           <Button
             variant="ghost"
             size="icon"
@@ -324,13 +395,18 @@ function DeliveryDashboardInner({ profile, setProfile, userName, onLogout }: Inn
 
         {/* My active jobs — always shown if any exist */}
         <MyJobsList jobs={myJobs} partnerPosition={partnerPosition} onChanged={loadMyJobs} />
+        <MyTransportJobsList
+          jobs={myTransportJobs}
+          partnerPosition={partnerPosition}
+          onChanged={loadMyTransportJobs}
+        />
 
         {/* Available job feed — online only */}
         {online && (
           <section className="space-y-3">
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <div>
-                <h2 className="text-lg font-semibold">Available pickups</h2>
+                <h2 className="text-lg font-semibold">Available work</h2>
                 <p className="text-xs text-muted-foreground flex items-center gap-1">
                   {coords ? (
                     <>
@@ -348,7 +424,7 @@ function DeliveryDashboardInner({ profile, setProfile, userName, onLogout }: Inn
               </Button>
             </div>
 
-            {/* Radius slider */}
+            {/* Radius slider — applies to both feeds */}
             <div className="bg-white rounded-lg border px-4 py-3">
               <div className="flex items-center justify-between text-sm mb-1.5">
                 <span className="font-medium">Search radius</span>
@@ -369,9 +445,47 @@ function DeliveryDashboardInner({ profile, setProfile, userName, onLogout }: Inn
               </div>
             </div>
 
+            {/* Feed tabs */}
+            <div className="flex gap-1 border-b">
+              <button
+                type="button"
+                onClick={() => setFeedTab('grocery')}
+                className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                  feedTab === 'grocery'
+                    ? 'border-primary text-foreground'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <Package className="h-3.5 w-3.5" />
+                Grocery pickups
+                {jobs && jobs.length > 0 && (
+                  <span className="ml-1 text-[10px] bg-brand-green text-white rounded-full px-1.5 py-0.5 font-bold">
+                    {jobs.length}
+                  </span>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => setFeedTab('transport')}
+                className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                  feedTab === 'transport'
+                    ? 'border-primary text-foreground'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <Truck className="h-3.5 w-3.5" />
+                Transport
+                {transportJobs && transportJobs.length > 0 && (
+                  <span className="ml-1 text-[10px] bg-orange-600 text-white rounded-full px-1.5 py-0.5 font-bold">
+                    {transportJobs.length}
+                  </span>
+                )}
+              </button>
+            </div>
+
             {geoError && (
               <div className="text-sm text-destructive bg-destructive/10 rounded-md px-3 py-2">
-                {geoError} — pickups can&apos;t be shown without your location.
+                {geoError} — jobs can&apos;t be shown without your location.
               </div>
             )}
             {feedError && (
@@ -380,14 +494,27 @@ function DeliveryDashboardInner({ profile, setProfile, userName, onLogout }: Inn
               </div>
             )}
 
-            <JobFeed
-              jobs={jobs}
-              hasLocation={!!coords}
-              onRefresh={loadJobs}
-              onAccepted={async () => {
-                await Promise.all([loadJobs(), loadMyJobs()]);
-              }}
-            />
+            {feedTab === 'grocery' && (
+              <JobFeed
+                jobs={jobs}
+                hasLocation={!!coords}
+                onRefresh={loadJobs}
+                onAccepted={async () => {
+                  await Promise.all([loadJobs(), loadMyJobs()]);
+                }}
+              />
+            )}
+            {feedTab === 'transport' && (
+              <TransportJobFeed
+                jobs={transportJobs}
+                hasLocation={!!coords}
+                hasVehicleType={!!profile.vehicleType}
+                onRefresh={loadTransportJobs}
+                onAccepted={async () => {
+                  await Promise.all([loadTransportJobs(), loadMyTransportJobs()]);
+                }}
+              />
+            )}
           </section>
         )}
       </main>
