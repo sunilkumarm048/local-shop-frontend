@@ -31,6 +31,7 @@ import {
 } from '@/lib/delivery';
 import { JobFeed } from '@/components/delivery/JobFeed';
 import { MyJobsList } from '@/components/delivery/MyJobsList';
+import { useLiveLocation } from '@/lib/useLiveLocation';
 
 type Coords = { lat: number; lng: number };
 
@@ -189,14 +190,35 @@ function DeliveryDashboardInner({ profile, setProfile, userName, onLogout }: Inn
     function onStatusUpdate() {
       loadJobs();
     }
+    // 5b: auto-assigner gave us a job — refresh my-jobs so it appears.
+    function onJobAssigned() {
+      loadMyJobs();
+    }
 
     socket.on('job:taken', onJobTaken);
     socket.on('order:status_update', onStatusUpdate);
+    socket.on('job:assigned', onJobAssigned);
     return () => {
       socket.off('job:taken', onJobTaken);
       socket.off('order:status_update', onStatusUpdate);
+      socket.off('job:assigned', onJobAssigned);
     };
-  }, [token, loadJobs]);
+  }, [token, loadJobs, loadMyJobs]);
+
+  // ---- 5b: live GPS streaming while online ----
+  // Watches position, throttles emits, fans out to anyone tracking the orders
+  // this partner is currently delivering.
+  const activeOrderIds = (myJobs || []).map((j) => j._id);
+  const { position: partnerPosition } = useLiveLocation({
+    enabled: profile.available,
+    orderIds: activeOrderIds,
+  });
+
+  // Mirror the live position into `coords` so the radius feed query stays
+  // anchored to where the partner actually is, not where they started.
+  useEffect(() => {
+    if (partnerPosition) setCoords(partnerPosition);
+  }, [partnerPosition]);
 
   // ---- online toggle ----
   // Flips DeliveryProfile.available over HTTP (durable) AND emits the socket
@@ -301,7 +323,7 @@ function DeliveryDashboardInner({ profile, setProfile, userName, onLogout }: Inn
         )}
 
         {/* My active jobs — always shown if any exist */}
-        <MyJobsList jobs={myJobs} onChanged={loadMyJobs} />
+        <MyJobsList jobs={myJobs} partnerPosition={partnerPosition} onChanged={loadMyJobs} />
 
         {/* Available job feed — online only */}
         {online && (
