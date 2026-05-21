@@ -3,7 +3,9 @@ import { useAuth } from '@/stores/auth';
 import type { OrderItem, OrderRecipient, OrderStatus } from './owner-orders';
 
 /**
- * Delivery partner API client (Phase 5a).
+ * Delivery partner API client.
+ * 5a: profile, job feed, accept, lifecycle.
+ * 5b: adds shop/recipient coords (already returned by the backend, now in types).
  */
 
 function token() {
@@ -30,6 +32,8 @@ export interface JobShop {
   name: string;
   logo?: string;
   address?: { line1?: string; city?: string; state?: string; pincode?: string };
+  /** GeoJSON Point [lng, lat]. Returned by GET /delivery/my-jobs (populated). */
+  location?: { type: 'Point'; coordinates: [number, number] };
 }
 
 /** A pickup available to grab (from GET /jobs). */
@@ -41,10 +45,10 @@ export interface AvailableJob {
   deliveryFee?: number;
   recipient?: OrderRecipient;
   vehicleId?: string;
-  distanceKm?: number; // shop → customer (saved at checkout)
+  distanceKm?: number;
   isSplit?: boolean;
   createdAt: string;
-  distanceToShopKm: number | null; // partner → shop, computed live
+  distanceToShopKm: number | null;
 }
 
 /** A job already assigned to this partner (from GET /my-jobs). */
