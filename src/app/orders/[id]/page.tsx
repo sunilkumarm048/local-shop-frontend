@@ -1,8 +1,9 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { use, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { CheckCircle2, Clock, Package, Truck } from 'lucide-react';
+import { CheckCircle2, Clock, Package, Truck, PackageCheck, Bike } from 'lucide-react';
 
 import { Header } from '@/components/layout/header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,13 +12,34 @@ import { fetchOrder } from '@/lib/orders';
 import { useAuth } from '@/stores/auth';
 import { getSocket } from '@/lib/socket';
 
+// Leaflet on the map → dynamic with ssr:false. Reuses the delivery-side map
+// component (it doesn't care who's viewing it).
+const DeliveryMap = dynamic(() => import('@/components/delivery/DeliveryMap'), {
+  ssr: false,
+  loading: () => (
+    <div className="h-[260px] rounded-lg border bg-muted/40 flex items-center justify-center text-sm text-muted-foreground">
+      Loading map…
+    </div>
+  ),
+});
+
+// Full lifecycle as the customer sees it. ready_for_pickup is collapsed into
+// the "Preparing" step visually since from the customer's POV the order
+// becoming ready and the partner picking it up are nearly simultaneous.
 const STATUS_STEPS = [
   { key: 'placed', label: 'Placed', icon: CheckCircle2 },
   { key: 'accepted', label: 'Accepted', icon: Clock },
   { key: 'preparing', label: 'Preparing', icon: Package },
+  { key: 'picked_up', label: 'Picked up', icon: PackageCheck },
   { key: 'out_for_delivery', label: 'On the way', icon: Truck },
   { key: 'delivered', label: 'Delivered', icon: CheckCircle2 },
 ];
+
+// Statuses that fold into an earlier visible step (so the tracker doesn't jump
+// forward and back when the order transits through `ready_for_pickup`).
+const STATUS_DISPLAY_MAP: Record<string, string> = {
+  ready_for_pickup: 'preparing',
+};
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -32,13 +54,28 @@ interface OrderShape {
   handlingFee: number;
   discount?: { amount: number; label?: string };
   status: string;
-  shop: { name: string; logo?: string };
+  shop: {
+    name: string;
+    logo?: string;
+    location?: { type: 'Point'; coordinates: [number, number] };
+  };
   items: Array<{ name: string; qty: number; price: number }>;
-  recipient: { name: string; phone: string; address: string };
+  recipient: {
+    name: string;
+    phone: string;
+    address: string;
+    location?: { type: 'Point'; coordinates: [number, number] };
+  };
   payment: { method: string; status: string };
+  deliveryPartner?: string;
   createdAt: string;
   placedAt?: string;
   deliveredAt?: string;
+}
+
+interface LatLng {
+  lat: number;
+  lng: number;
 }
 
 export default function OrderDetailPage({ params }: PageProps) {
@@ -47,6 +84,7 @@ export default function OrderDetailPage({ params }: PageProps) {
 
   const [order, setOrder] = useState<OrderShape | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [partnerPos, setPartnerPos] = useState<LatLng | null>(null);
 
   useEffect(() => {
     fetchOrder(id)
@@ -54,22 +92,35 @@ export default function OrderDetailPage({ params }: PageProps) {
       .catch((e) => setError(e.message || 'Could not load order'));
   }, [id]);
 
-  // Subscribe to live updates for this order
+  // Subscribe to live updates for this order.
+  // Phase 4b/5a backend emits `order:status_update` (NOT `order:status` —
+  // that was a bug in the v3 client that silently never matched).
+  // Phase 5b adds `delivery:location` while the partner is moving.
   useEffect(() => {
     if (!token) return;
     const socket = getSocket(token);
     if (!socket) return;
 
     socket.emit('order:join', { orderId: id });
-    const onStatus = (payload: { orderId: string; status: string }) => {
+
+    function onStatusUpdate(payload: { orderId: string; status: string }) {
       if (payload.orderId === id) {
         setOrder((prev) => (prev ? { ...prev, status: payload.status } : prev));
       }
-    };
-    socket.on('order:status', onStatus);
+    }
+
+    function onPartnerLocation(payload: { orderId: string; lat: number; lng: number }) {
+      if (payload.orderId === id) {
+        setPartnerPos({ lat: payload.lat, lng: payload.lng });
+      }
+    }
+
+    socket.on('order:status_update', onStatusUpdate);
+    socket.on('delivery:location', onPartnerLocation);
 
     return () => {
-      socket.off('order:status', onStatus);
+      socket.off('order:status_update', onStatusUpdate);
+      socket.off('delivery:location', onPartnerLocation);
       socket.emit('order:leave', { orderId: id });
     };
   }, [id, token]);
@@ -99,8 +150,30 @@ export default function OrderDetailPage({ params }: PageProps) {
     );
   }
 
-  const statusIndex = STATUS_STEPS.findIndex((s) => s.key === order.status);
+  // Map raw status to display status, then find its index in the visible list.
+  const displayStatus = STATUS_DISPLAY_MAP[order.status] || order.status;
+  const statusIndex = STATUS_STEPS.findIndex((s) => s.key === displayStatus);
   const isCancelled = order.status === 'cancelled' || order.status === 'refunded';
+
+  // Extract coords for the map.
+  const shopCoords = order.shop.location?.coordinates;
+  const shopLL = shopCoords ? { lng: shopCoords[0], lat: shopCoords[1] } : null;
+  const custCoords = order.recipient.location?.coordinates;
+  const custLL = custCoords ? { lng: custCoords[0], lat: custCoords[1] } : null;
+
+  // Show the map once a partner is assigned (status has advanced past
+  // preparing). Before that, nothing's moving — no point.
+  const partnerAssigned =
+    !!order.deliveryPartner ||
+    ['picked_up', 'out_for_delivery', 'delivered'].includes(order.status);
+  const showMap = partnerAssigned && shopLL && !isCancelled;
+
+  const activeLeg: 'to_shop' | 'to_customer' | null =
+    order.status === 'picked_up' || order.status === 'ready_for_pickup'
+      ? 'to_shop'
+      : order.status === 'out_for_delivery'
+        ? 'to_customer'
+        : null;
 
   return (
     <>
@@ -112,6 +185,38 @@ export default function OrderDetailPage({ params }: PageProps) {
             Placed {new Date(order.createdAt).toLocaleString()}
           </p>
         </div>
+
+        {/* Live delivery map */}
+        {showMap && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Bike className="h-4 w-4 text-brand-green" />
+                Live delivery
+                {partnerPos && (
+                  <span className="text-xs font-normal text-brand-green ml-auto">
+                    Tracking
+                  </span>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <DeliveryMap
+                partner={partnerPos}
+                shop={shopLL}
+                customer={custLL}
+                activeLeg={activeLeg}
+                height={260}
+              />
+              {!partnerPos && (
+                <p className="text-xs text-muted-foreground mt-2 text-center">
+                  Your delivery partner&apos;s location will appear here once they start
+                  moving.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Status tracker */}
         <Card>
