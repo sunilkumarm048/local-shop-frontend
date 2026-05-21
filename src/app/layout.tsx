@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import { PWARegistration } from '@/components/pwa/PWARegistration';
+import { VoiceButton } from '@/components/voice/VoiceButton';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -11,7 +12,8 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: 'Local Shop',
-  description: 'Hyperlocal grocery + transport — order from shops nearby or book a vehicle to move anything.',
+  description:
+    'Hyperlocal grocery + transport — order from shops nearby or book a vehicle to move anything.',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
@@ -33,6 +35,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="font-sans min-h-screen">
         {children}
         <PWARegistration />
+        <VoiceButton />
       </body>
     </html>
   );
