@@ -1,5 +1,6 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { useState } from 'react';
 import {
   Loader2,
@@ -10,22 +11,34 @@ import {
   Truck,
   CheckCircle2,
   Store,
+  Navigation,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ApiError } from '@/lib/api';
-import {
-  markPickedUp,
-  markOnWay,
-  markDelivered,
-  type MyJob,
-} from '@/lib/delivery';
+import { markPickedUp, markOnWay, markDelivered, type MyJob } from '@/lib/delivery';
 import type { OrderStatus } from '@/lib/owner-orders';
+
+// Leaflet touches window at import time — dynamic with ssr:false.
+const DeliveryMap = dynamic(() => import('./DeliveryMap'), {
+  ssr: false,
+  loading: () => (
+    <div className="h-[220px] rounded-lg border bg-muted/40 flex items-center justify-center text-sm text-muted-foreground">
+      Loading map…
+    </div>
+  ),
+});
+
+interface PartnerPos {
+  lat: number;
+  lng: number;
+}
 
 interface Props {
   jobs: MyJob[] | null;
+  partnerPosition: PartnerPos | null;
   onChanged: () => void | Promise<void>;
 }
 
@@ -41,7 +54,7 @@ function statusVariant(s: OrderStatus): 'default' | 'success' | 'warning' {
   return 'success'; // picked_up
 }
 
-export function MyJobsList({ jobs, onChanged }: Props) {
+export function MyJobsList({ jobs, partnerPosition, onChanged }: Props) {
   if (jobs === null) {
     return (
       <div className="py-4 flex items-center justify-center text-sm text-muted-foreground">
@@ -51,7 +64,7 @@ export function MyJobsList({ jobs, onChanged }: Props) {
     );
   }
 
-  if (jobs.length === 0) return null; // nothing assigned — section hidden
+  if (jobs.length === 0) return null;
 
   return (
     <section className="space-y-3">
@@ -59,7 +72,12 @@ export function MyJobsList({ jobs, onChanged }: Props) {
         Your active {jobs.length === 1 ? 'job' : 'jobs'}
       </h2>
       {jobs.map((job) => (
-        <MyJobCard key={job._id} job={job} onChanged={onChanged} />
+        <MyJobCard
+          key={job._id}
+          job={job}
+          partnerPosition={partnerPosition}
+          onChanged={onChanged}
+        />
       ))}
     </section>
   );
@@ -67,7 +85,15 @@ export function MyJobsList({ jobs, onChanged }: Props) {
 
 // ---------------------------------------------------------------------------
 
-function MyJobCard({ job, onChanged }: { job: MyJob; onChanged: () => void | Promise<void> }) {
+function MyJobCard({
+  job,
+  partnerPosition,
+  onChanged,
+}: {
+  job: MyJob;
+  partnerPosition: PartnerPos | null;
+  onChanged: () => void | Promise<void>;
+}) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -87,8 +113,25 @@ function MyJobCard({ job, onChanged }: { job: MyJob; onChanged: () => void | Pro
   const shortId = job._id.slice(-6).toUpperCase();
   const itemCount = job.items.reduce((s, i) => s + i.qty, 0);
 
+  // Extract coordinates for the map. Mongo stores [lng, lat]; the map wants {lat, lng}.
+  const shopCoords = job.shop?.location?.coordinates;
+  const shopLL = shopCoords ? { lng: shopCoords[0], lat: shopCoords[1] } : null;
+  const custCoords = job.recipient?.location?.coordinates;
+  const custLL = custCoords ? { lng: custCoords[0], lat: custCoords[1] } : null;
+
+  // Which leg is currently "active"?
+  // ready_for_pickup or picked_up → heading to the shop (well, picked_up means
+  // *just* left the shop, but visually the active leg flips when they tap
+  // "Start delivery" which moves status to out_for_delivery).
+  const activeLeg: 'to_shop' | 'to_customer' | null =
+    job.status === 'ready_for_pickup'
+      ? 'to_shop'
+      : job.status === 'out_for_delivery'
+        ? 'to_customer'
+        : null;
+
   return (
-    <Card className="border-brand-green/40">
+    <Card className="border-brand-green/40 overflow-hidden">
       <CardContent className="pt-4 space-y-3">
         {/* Header */}
         <div className="flex items-start justify-between gap-2">
@@ -106,7 +149,18 @@ function MyJobCard({ job, onChanged }: { job: MyJob; onChanged: () => void | Pro
           </div>
         </div>
 
-        {/* Route: pickup → drop */}
+        {/* Map — only if we have at least the shop's coords */}
+        {shopLL && (
+          <DeliveryMap
+            partner={partnerPosition}
+            shop={shopLL}
+            customer={custLL}
+            activeLeg={activeLeg}
+            height={220}
+          />
+        )}
+
+        {/* Route legend */}
         <div className="space-y-2">
           <div className="flex items-start gap-2 text-sm">
             <div className="h-7 w-7 rounded-full bg-brand-greenLight flex items-center justify-center shrink-0">
@@ -158,7 +212,8 @@ function MyJobCard({ job, onChanged }: { job: MyJob; onChanged: () => void | Pro
 
         {/* Summary */}
         <div className="flex items-center justify-between text-sm bg-muted/40 rounded-md px-2.5 py-2">
-          <span className="text-muted-foreground">
+          <span className="text-muted-foreground flex items-center gap-1.5">
+            <Navigation className="h-3.5 w-3.5" />
             {itemCount} item{itemCount !== 1 ? 's' : ''}
             {job.distanceKm ? ` · ${job.distanceKm} km` : ''}
           </span>
@@ -171,13 +226,9 @@ function MyJobCard({ job, onChanged }: { job: MyJob; onChanged: () => void | Pro
           </div>
         )}
 
-        {/* Lifecycle action — one button, depends on status */}
+        {/* Lifecycle action */}
         {job.status === 'ready_for_pickup' && (
-          <Button
-            className="w-full"
-            disabled={busy}
-            onClick={() => run(() => markPickedUp(job._id))}
-          >
+          <Button className="w-full" disabled={busy} onClick={() => run(() => markPickedUp(job._id))}>
             {busy ? (
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
             ) : (
@@ -187,11 +238,7 @@ function MyJobCard({ job, onChanged }: { job: MyJob; onChanged: () => void | Pro
           </Button>
         )}
         {job.status === 'picked_up' && (
-          <Button
-            className="w-full"
-            disabled={busy}
-            onClick={() => run(() => markOnWay(job._id))}
-          >
+          <Button className="w-full" disabled={busy} onClick={() => run(() => markOnWay(job._id))}>
             {busy ? (
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
             ) : (
@@ -201,11 +248,7 @@ function MyJobCard({ job, onChanged }: { job: MyJob; onChanged: () => void | Pro
           </Button>
         )}
         {job.status === 'out_for_delivery' && (
-          <Button
-            className="w-full"
-            disabled={busy}
-            onClick={() => run(() => markDelivered(job._id))}
-          >
+          <Button className="w-full" disabled={busy} onClick={() => run(() => markDelivered(job._id))}>
             {busy ? (
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
             ) : (
