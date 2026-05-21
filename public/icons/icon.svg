@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Full bleed brand-green background. Designed for "maskable" purpose:
+       the central 80% (102.4–409.6 on each axis) is the safe zone, and the
+       outer 10% on each side may be cropped by Android's circular/squircle
+       mask without losing the storefront. -->
+  <rect width="512" height="512" fill="#0C831F" />
+
+  <!-- White rounded square card behind the storefront — keeps the glyph
+       readable on top of the green when not masked. -->
+  <rect x="96" y="96" width="320" height="320" rx="56" fill="#ffffff" />
+
+  <!-- Yellow awning bar across the top of the storefront. -->
+  <rect x="128" y="156" width="256" height="40" rx="8" fill="#F8CD46" />
+  <rect x="128" y="156" width="32" height="40" fill="#F8CD46" />
+  <rect x="192" y="156" width="32" height="40" fill="#E6B833" opacity="0.6" />
+  <rect x="256" y="156" width="32" height="40" fill="#E6B833" opacity="0.6" />
+  <rect x="320" y="156" width="32" height="40" fill="#E6B833" opacity="0.6" />
+
+  <!-- Shop body. -->
+  <rect x="144" y="204" width="224" height="180" rx="6" fill="#0C831F" />
+
+  <!-- Door. -->
+  <rect x="232" y="252" width="48" height="132" rx="3" fill="#ffffff" />
+  <circle cx="270" cy="318" r="3" fill="#0C831F" />
+
+  <!-- Window (left). -->
+  <rect x="168" y="252" width="48" height="48" rx="3" fill="#F8CD46" />
+  <!-- Window (right). -->
+  <rect x="296" y="252" width="48" height="48" rx="3" fill="#F8CD46" />
+</svg>
