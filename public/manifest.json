@@ -1,0 +1,20 @@
+{
+  "name": "Local Shop",
+  "short_name": "Local Shop",
+  "description": "Hyperlocal grocery + transport — order from shops nearby or book a vehicle to move anything.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#0C831F",
+  "categories": ["shopping", "food", "lifestyle"],
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
