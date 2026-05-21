@@ -2,7 +2,9 @@ import { api } from './api';
 import { useAuth } from '@/stores/auth';
 
 /**
- * Transport booking API client (Phase 6b.1).
+ * Transport API client.
+ * 6b.1: customer-side (quote, book, list, get, cancel).
+ * 6b.2: delivery partner side (jobs, my-jobs, accept, lifecycle).
  */
 
 function token() {
@@ -12,7 +14,6 @@ function token() {
 export const VEHICLE_IDS = ['bike', '3wheeler', 'tataAce', 'pickup8ft', 'tata407'] as const;
 export type VehicleId = (typeof VEHICLE_IDS)[number];
 
-/** Returned by /transport/quote and /transport/quote-all. */
 export interface VehicleQuote {
   vehicleId: VehicleId;
   vehicleName: string;
@@ -38,38 +39,36 @@ export interface PartyInput {
   location: LatLng;
 }
 
-/** Transport order as stored & returned. */
+export interface TransportParty {
+  name?: string;
+  phone?: string;
+  address?: string;
+  location: { type: 'Point'; coordinates: [number, number] };
+}
+
+export type TransportStatus =
+  | 'pending_payment'
+  | 'placed'
+  | 'accepted'
+  | 'picked_up'
+  | 'in_transit'
+  | 'delivered'
+  | 'cancelled';
+
 export interface TransportOrder {
   _id: string;
   customer: string;
   deliveryPartner?: { _id: string; name?: string; phone?: string } | string;
   vehicleId: VehicleId;
-  pickup: {
-    name?: string;
-    phone?: string;
-    address?: string;
-    location: { type: 'Point'; coordinates: [number, number] };
-  };
-  drop: {
-    name?: string;
-    phone?: string;
-    address?: string;
-    location: { type: 'Point'; coordinates: [number, number] };
-  };
+  pickup: TransportParty;
+  drop: TransportParty;
   distanceKm?: number;
   estimatedWeightKg?: number;
   notes?: string;
   fee: number;
   platformFee: number;
   total: number;
-  status:
-    | 'pending_payment'
-    | 'placed'
-    | 'accepted'
-    | 'picked_up'
-    | 'in_transit'
-    | 'delivered'
-    | 'cancelled';
+  status: TransportStatus;
   statusHistory?: Array<{ status: string; at: string; by?: string; note?: string }>;
   payment?: { method: 'razorpay' | 'cod'; status: string };
   placedAt?: string;
@@ -78,7 +77,12 @@ export interface TransportOrder {
   updatedAt: string;
 }
 
-// ---------- quotes ----------
+/** A transport job in the partner feed — same as TransportOrder + distance-to-pickup. */
+export interface AvailableTransportJob extends TransportOrder {
+  distanceToPickupKm: number | null;
+}
+
+// ============ customer (6b.1) ============
 
 export async function quoteAll(pickup: LatLng, drop: LatLng) {
   return api<{ quotes: VehicleQuote[] }>('/transport/quote-all', {
@@ -95,8 +99,6 @@ export async function quoteOne(vehicleId: VehicleId, pickup: LatLng, drop: LatLn
     token: token(),
   });
 }
-
-// ---------- book / list / get / cancel ----------
 
 export interface BookInput {
   vehicleId: VehicleId;
@@ -127,6 +129,47 @@ export async function fetchTransportOrder(id: string) {
 
 export async function cancelTransport(id: string) {
   return api<{ order: TransportOrder }>(`/transport/${id}/cancel`, {
+    method: 'POST',
+    token: token(),
+  });
+}
+
+// ============ delivery partner (6b.2) ============
+
+export async function fetchTransportJobs(lng: number, lat: number, radiusKm: number) {
+  return api<{ jobs: AvailableTransportJob[] }>(
+    `/transport/jobs?lng=${lng}&lat=${lat}&radiusKm=${radiusKm}`,
+    { token: token() }
+  );
+}
+
+export async function fetchMyTransportJobs() {
+  return api<{ jobs: TransportOrder[] }>('/transport/my-jobs', { token: token() });
+}
+
+export async function acceptTransportJob(id: string) {
+  return api<{ order: TransportOrder }>(`/transport/${id}/accept`, {
+    method: 'POST',
+    token: token(),
+  });
+}
+
+export async function transportPickup(id: string) {
+  return api<{ order: TransportOrder }>(`/transport/${id}/pickup`, {
+    method: 'POST',
+    token: token(),
+  });
+}
+
+export async function transportStart(id: string) {
+  return api<{ order: TransportOrder }>(`/transport/${id}/start`, {
+    method: 'POST',
+    token: token(),
+  });
+}
+
+export async function transportDeliver(id: string) {
+  return api<{ order: TransportOrder }>(`/transport/${id}/deliver`, {
     method: 'POST',
     token: token(),
   });
