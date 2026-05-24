@@ -1,5 +1,4 @@
 'use client';
-
 import { useState } from 'react';
 import { Loader2, MapPin, Package, Navigation, IndianRupee, Phone, Truck } from 'lucide-react';
 
