@@ -33,7 +33,7 @@ Next.js 15 (App Router) frontend for Local Shop.
 - [x] Checkout page with Razorpay modal integration
 - [x] Order tracking with Socket.IO live status updates
 - [ ] Shop/delivery/admin dashboards (Phases 4–6)
-- [ ] Google OAuth (one provider in Auth.js when you have credentials)
+- [ ] Google OAuth (one provider in Auth.js when you have  credentials)
 
 ## Setup
 ```bash
