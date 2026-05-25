@@ -14,6 +14,9 @@ import {
   Shield,
   IndianRupee,
   Banknote,
+  Percent,
+  Package,
+  ShieldCheck,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -28,8 +31,21 @@ import { AdminOrdersTab } from '@/components/admin/AdminOrdersTab';
 import { AdminCategoriesTab } from '@/components/admin/AdminCategoriesTab';
 import AdminPricingTab from '@/components/admin/AdminPricingTab';
 import AdminWithdrawalsTab from '@/components/admin/AdminWithdrawalsTab';
+import AdminShopDiscountsTab from '@/components/admin/AdminShopDiscountsTab';
+import AdminManageProductsTab from '@/components/admin/AdminManageProductsTab';
+import AdminDocVerificationTab from '@/components/admin/AdminDocVerificationTab';
 
-type Section = 'overview' | 'shops' | 'users' | 'orders' | 'categories' | 'pricing' | 'withdrawals';
+type Section =
+  | 'overview'
+  | 'shops'
+  | 'users'
+  | 'orders'
+  | 'categories'
+  | 'pricing'
+  | 'withdrawals'
+  | 'discounts'
+  | 'products'
+  | 'verifications';
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -99,6 +115,9 @@ export default function AdminDashboard() {
           {section === 'categories' && <AdminCategoriesTab />}
           {section === 'pricing' && <AdminPricingTab />}
           {section === 'withdrawals' && <AdminWithdrawalsTab />}
+          {section === 'discounts' && <AdminShopDiscountsTab />}
+          {section === 'products' && <AdminManageProductsTab />}
+          {section === 'verifications' && <AdminDocVerificationTab />}
         </div>
       </main>
     </div>
@@ -118,7 +137,10 @@ function SectionNav({ current, onChange }: NavProps) {
     { id: 'orders', label: 'Orders', icon: ListOrdered },
     { id: 'categories', label: 'Categories', icon: Tags },
     { id: 'pricing', label: 'Pricing', icon: IndianRupee },
+    { id: 'discounts', label: 'Discounts', icon: Percent },
+    { id: 'products', label: 'Products', icon: Package },
     { id: 'withdrawals', label: 'Withdrawals', icon: Banknote },
+    { id: 'verifications', label: 'Verifications', icon: ShieldCheck },
   ];
   return (
     <nav className="flex gap-1 border-b overflow-x-auto">
