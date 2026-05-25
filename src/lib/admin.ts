@@ -32,11 +32,18 @@ export interface AdminUser {
 }
 
 /** Shop with admin-only fields surfaced (owner populated). */
+/**
+ * Shop with admin-only fields surfaced (owner populated as full object).
+ *
+ * The base `Shop` type declares `owner` as a string (just the user ID, what
+ * customer-facing endpoints return). Admin endpoints populate it with the
+ * full user document, so we Omit the base field and redeclare it. Same
+ * pattern for `isApproved`/`isBlocked` — present on the Mongoose document
+ * but stripped from public shop endpoints.
+ */
 export interface AdminShop extends Omit<Shop, 'owner'> {
   owner?: { _id: string; name?: string; email?: string; phone?: string };
   adminNote?: string;
-  // Admin-only moderation flags. Server populates these from the Shop document
-  // for admin endpoints; absent for public shop endpoints (hence optional).
   isApproved?: boolean;
   isBlocked?: boolean;
 }
@@ -162,4 +169,84 @@ export async function deleteCategory(id: string) {
     token: token(),
   });
 }
-  
+
+// ============================================================
+// PHASE 7a — Pricing config
+// ============================================================
+
+export interface VehicleConfig {
+  id: string;
+  name?: string;
+  icon?: string;
+  maxKg: number;
+  perKmRate: number;
+  minFee: number;
+}
+
+export interface PricingConfig {
+  _id?: string;
+  key?: string;
+  vehicles: Record<string, VehicleConfig>;
+  handlingFee: number;
+  platformFeePercent: number;
+  globalDiscount?: { enabled: boolean; type: 'percent' | 'flat'; value: number; label?: string };
+  updatedAt?: string;
+}
+
+export async function fetchPricingConfig() {
+  return api<{ config: PricingConfig }>('/admin/pricing', { token: token() });
+}
+
+export interface PricingUpdateInput {
+  vehicles?: Record<string, { maxKg: number; perKmRate: number; minFee: number }>;
+  handlingFee?: number;
+  platformFeePercent?: number;
+}
+
+export async function updatePricingConfig(input: PricingUpdateInput) {
+  return api<{ config: PricingConfig }>('/admin/pricing', {
+    method: 'PATCH',
+    body: input,
+    token: token(),
+  });
+}
+
+// ============================================================
+// PHASE 7a — Withdrawal admin
+// ============================================================
+
+export type WithdrawStatus = 'pending' | 'approved' | 'paid' | 'rejected';
+
+export interface AdminWithdrawRequest {
+  _id: string;
+  deliveryPartner?: { _id: string; name?: string; email?: string; phone?: string } | string;
+  amount: number;
+  method: 'upi' | 'bank';
+  upiId?: string;
+  bankDetails?: { accountName: string; accountNumber: string; ifsc: string };
+  status: WithdrawStatus;
+  transactionRef?: string;
+  rejectionReason?: string;
+  createdAt: string;
+  processedAt?: string;
+}
+
+export async function fetchAdminWithdrawals(status: WithdrawStatus | 'all' = 'pending') {
+  return api<{ requests: AdminWithdrawRequest[] }>(`/admin/withdrawals?status=${status}`, {
+    token: token(),
+  });
+}
+
+export interface WithdrawProcessInput {
+  action: 'approve' | 'paid' | 'reject';
+  transactionRef?: string;
+  rejectionReason?: string;
+}
+
+export async function processWithdrawal(id: string, input: WithdrawProcessInput) {
+  return api<{ request: AdminWithdrawRequest }>(`/admin/withdrawals/${id}`, {
+    method: 'PATCH',
+    body: input,
+    token: token(),
+  });
+}
