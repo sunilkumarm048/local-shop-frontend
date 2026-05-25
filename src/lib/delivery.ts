@@ -20,6 +20,13 @@ export interface DeliveryProfile {
   vehicleType?: 'bike' | '3wheeler' | 'tataAce' | 'pickup8ft' | 'tata407';
   vehicleNumber?: string;
   licenseNumber?: string;
+  // 7c: docs subdoc — populated when partner uploads document URLs.
+  documents?: {
+    drivingLicenseUrl?: string;
+    aadhaarUrl?: string;
+    vehicleRcUrl?: string;
+    verified: boolean;
+  };
   walletBalance: number;
   totalEarnings: number;
   totalDeliveries: number;
@@ -165,6 +172,24 @@ export async function submitWithdrawal(input: SubmitWithdrawInput) {
 
 export async function fetchMyWithdrawals() {
   return api<{ requests: WithdrawRequest[] }>('/delivery/withdrawals/mine', {
+    token: token(),
+  });
+}
+
+// ============================================================
+// PHASE 7c — Document submission
+// ============================================================
+
+export interface DocumentsInput {
+  drivingLicenseUrl?: string;
+  aadhaarUrl?: string;
+  vehicleRcUrl?: string;
+}
+
+export async function updateMyDocuments(input: DocumentsInput) {
+  return api<{ profile: DeliveryProfile }>('/delivery/me/documents', {
+    method: 'PATCH',
+    body: input,
     token: token(),
   });
 }
