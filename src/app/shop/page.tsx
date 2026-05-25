@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Loader2, LogOut, Package, Store, ListOrdered } from 'lucide-react';
+import { Loader2, LogOut, Package, Store, ListOrdered, TrendingUp } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/stores/auth';
@@ -17,8 +17,9 @@ import { ShopWizard } from '@/components/shop/ShopWizard';
 import { StorefrontTab } from '@/components/shop/StorefrontTab';
 import { ProductsTab } from '@/components/shop/ProductsTab';
 import { OrdersTab } from '@/components/shop/OrdersTab';
+import { ShopAnalyticsTab } from '@/components/shop/ShopAnalyticsTab';
 
-type Section = 'storefront' | 'products' | 'orders';
+type Section = 'storefront' | 'products' | 'orders' | 'analytics';
 
 export default function ShopDashboard() {
   const router = useRouter();
@@ -129,6 +130,7 @@ export default function ShopDashboard() {
           )}
           {section === 'products' && <ProductsTab shopId={shop._id} />}
           {section === 'orders' && <OrdersTab shopId={shop._id} />}
+          {section === 'analytics' && <ShopAnalyticsTab />}
         </div>
       </main>
     </div>
@@ -245,6 +247,7 @@ function SectionNav({ current, onChange }: NavProps) {
     { id: 'storefront', label: 'Storefront', icon: Store },
     { id: 'products', label: 'Products', icon: Package },
     { id: 'orders', label: 'Orders', icon: ListOrdered },
+    { id: 'analytics', label: 'Analytics', icon: TrendingUp },
   ];
   return (
     <nav className="flex gap-1 border-b">
