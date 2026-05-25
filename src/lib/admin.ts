@@ -162,3 +162,4 @@ export async function deleteCategory(id: string) {
     token: token(),
   });
 }
+  
