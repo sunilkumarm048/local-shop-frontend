@@ -35,6 +35,10 @@ export interface AdminUser {
 export interface AdminShop extends Shop {
   owner?: { _id: string; name?: string; email?: string; phone?: string };
   adminNote?: string;
+  // Admin-only moderation flags. Server populates these from the Shop document
+  // for admin endpoints; absent for public shop endpoints (hence optional).
+  isApproved?: boolean;
+  isBlocked?: boolean;
 }
 
 export interface AdminOrder {
