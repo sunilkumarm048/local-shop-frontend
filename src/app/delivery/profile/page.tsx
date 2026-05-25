@@ -26,6 +26,7 @@ import {
   updateMyDocuments,
   type DeliveryProfile,
 } from '@/lib/delivery';
+import { DocumentUploader } from '@/components/uploads/DocumentUploader';
 
 const VEHICLE_OPTIONS: Array<{ id: NonNullable<DeliveryProfile['vehicleType']>; name: string; icon: string }> = [
   { id: 'bike', name: '2-Wheeler', icon: '🛵' },
@@ -317,30 +318,23 @@ function Documents({ profile, onSaved }: { profile: DeliveryProfile; onSaved: (p
           Documents
         </h2>
         <p className="text-xs text-muted-foreground">
-          Paste image URLs (e.g. uploaded to Google Drive, Imgur, or any public hosting).
-          Direct file uploads coming in a future update.
+          Upload a photo of each document. Hosted securely on Cloudinary; admin will review within 24 hours.
         </p>
 
-        <Field
-          label="Driving license photo URL"
+        <DocumentUploader
+          label="Driving license"
           value={dl}
           onChange={setDl}
-          placeholder="https://…"
-          type="url"
         />
-        <Field
-          label="Aadhaar card URL (optional)"
+        <DocumentUploader
+          label="Aadhaar card (optional)"
           value={aadhaar}
           onChange={setAadhaar}
-          placeholder="https://…"
-          type="url"
         />
-        <Field
-          label="Vehicle RC URL"
+        <DocumentUploader
+          label="Vehicle RC"
           value={rc}
           onChange={setRc}
-          placeholder="https://…"
-          type="url"
         />
 
         {profile.documents?.verified && dirty && (
