@@ -46,6 +46,13 @@ export interface AdminShop extends Omit<Shop, 'owner'> {
   adminNote?: string;
   isApproved?: boolean;
   isBlocked?: boolean;
+  // 7c: discount lives on the shop document; surfaced here for admin oversight.
+  discount?: {
+    enabled: boolean;
+    type: 'percent' | 'flat';
+    value: number;
+    label?: string;
+  };
 }
 
 export interface AdminOrder {
@@ -239,7 +246,7 @@ export async function fetchAdminWithdrawals(status: WithdrawStatus | 'all' = 'pe
 
 export interface WithdrawProcessInput {
   action: 'approve' | 'paid' | 'reject';
-  transactionRef?: string;  
+  transactionRef?: string;
   rejectionReason?: string;
 }
 
@@ -249,4 +256,106 @@ export async function processWithdrawal(id: string, input: WithdrawProcessInput)
     body: input,
     token: token(),
   });
+}
+
+// ============================================================
+// PHASE 7c — Shop discount
+// ============================================================
+
+export interface ShopDiscount {
+  enabled: boolean;
+  type: 'percent' | 'flat';
+  value: number;
+  label?: string;
+}
+
+export async function setShopDiscount(shopId: string, discount: ShopDiscount) {
+  return api<{ shop: AdminShop }>(`/admin/shops/${shopId}/discount`, {
+    method: 'PATCH',
+    body: discount,
+    token: token(),
+  });
+}
+
+// ============================================================
+// PHASE 7c — Product oversight
+// ============================================================
+
+export interface AdminProduct {
+  _id: string;
+  name: string;
+  price: number;
+  weight?: string;
+  category?: string;
+  imageUrl?: string;
+  isActive: boolean;
+  shop?: { _id: string; name: string } | string;
+  createdAt: string;
+}
+
+export interface AdminProductsResponse {
+  products: AdminProduct[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export async function fetchAdminProducts(opts: {
+  q?: string;
+  shopId?: string;
+  page?: number;
+  limit?: number;
+  includeInactive?: boolean;
+} = {}) {
+  const params = new URLSearchParams();
+  if (opts.q) params.set('q', opts.q);
+  if (opts.shopId) params.set('shopId', opts.shopId);
+  if (opts.page) params.set('page', String(opts.page));
+  if (opts.limit) params.set('limit', String(opts.limit));
+  if (opts.includeInactive) params.set('inactive', 'true');
+  return api<AdminProductsResponse>(`/admin/products?${params.toString()}`, { token: token() });
+}
+
+export async function setProductActive(productId: string, isActive: boolean) {
+  return api<{ product: AdminProduct }>(`/admin/products/${productId}`, {
+    method: 'PATCH',
+    body: { isActive },
+    token: token(),
+  });
+}
+
+// ============================================================
+// PHASE 7c — Delivery partner doc verification
+// ============================================================
+
+export interface AdminDeliveryPartner {
+  _id: string;
+  user?: { _id: string; name?: string; email?: string; phone?: string };
+  vehicleType?: string;
+  vehicleNumber?: string;
+  licenseNumber?: string;
+  documents?: {
+    drivingLicenseUrl?: string;
+    aadhaarUrl?: string;
+    vehicleRcUrl?: string;
+    verified: boolean;
+  };
+  available?: boolean;
+  walletBalance?: number;
+  totalDeliveries?: number;
+  updatedAt?: string;
+}
+
+export async function fetchAdminDeliveryPartners(filter: 'all' | 'pending' | 'true' | 'false' = 'pending') {
+  return api<{ partners: AdminDeliveryPartner[] }>(
+    `/admin/delivery-partners?verified=${filter}`,
+    { token: token() }
+  );
+}
+
+export async function setDeliveryPartnerVerified(userId: string, verified: boolean) {
+  return api<{ profile: AdminDeliveryPartner }>(
+    `/admin/delivery-partners/${userId}/verify`,
+    { method: 'PATCH', body: { verified }, token: token() }
+  );
 }
