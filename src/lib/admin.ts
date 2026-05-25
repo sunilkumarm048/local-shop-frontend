@@ -239,7 +239,7 @@ export async function fetchAdminWithdrawals(status: WithdrawStatus | 'all' = 'pe
 
 export interface WithdrawProcessInput {
   action: 'approve' | 'paid' | 'reject';
-  transactionRef?: string;
+  transactionRef?: string;  
   rejectionReason?: string;
 }
 
