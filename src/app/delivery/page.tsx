@@ -21,6 +21,7 @@ import {
   CheckCircle2,
   ChevronDown,
   Check,
+  CircleUser,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -336,6 +337,14 @@ function DeliveryDashboardInner({ profile, setProfile, userName, onLogout }: Inn
             className="text-white hover:bg-white/10 p-2 rounded-md"
           >
             <TrendingUp className="h-5 w-5" />
+          </Link>
+
+          <Link
+            href="/delivery/profile"
+            aria-label="Profile"
+            className="text-white hover:bg-white/10 p-2 rounded-md"
+          >
+            <CircleUser className="h-5 w-5" />
           </Link>
 
           <Button variant="ghost" size="icon" aria-label="Logout" onClick={onLogout} className="text-white hover:bg-white/10">
