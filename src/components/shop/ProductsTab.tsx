@@ -28,6 +28,7 @@ import {
 } from '@/lib/owner';
 import { ApiError } from '@/lib/api';
 import type { Product } from '@/lib/shops';
+import { ImageUploader } from '@/components/uploads/ImageUploader';
 
 const productSchema = z.object({
   name: z.string().trim().min(1, 'Required').max(120),
@@ -286,8 +287,13 @@ function ProductDialog({ open, onOpenChange, shopId, product, onSaved }: DialogP
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="p-image">Image URL</Label>
-            <Input id="p-image" type="url" {...form.register('image')} placeholder="https://..." />
+            <Label>Product image</Label>
+            <ImageUploader
+              value={form.watch('image') || ''}
+              onChange={(url) => form.setValue('image', url, { shouldValidate: true, shouldDirty: true })}
+              kind="product"
+              variant="thumbnail"
+            />
             {form.formState.errors.image && (
               <p className="text-xs text-destructive">{form.formState.errors.image.message}</p>
             )}
