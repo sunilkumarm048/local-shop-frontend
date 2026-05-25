@@ -338,7 +338,9 @@ function DeliveryDashboardInner({ profile, setProfile, userName, onLogout }: Inn
 
       <main className="flex-1 container py-5 space-y-5">
         <div className="grid grid-cols-3 gap-3">
-          <StatCard icon={Wallet} label="Wallet" value={`₹${profile.walletBalance}`} />
+          <Link href="/delivery/wallet" className="block">
+            <StatCard icon={Wallet} label="Wallet →" value={`₹${profile.walletBalance}`} />
+          </Link>
           <StatCard icon={Package} label="Deliveries" value={String(profile.totalDeliveries)} />
           <StatCard icon={TrendingUp} label="Earned" value={`₹${profile.totalEarnings}`} />
         </div>
