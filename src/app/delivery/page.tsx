@@ -330,6 +330,14 @@ function DeliveryDashboardInner({ profile, setProfile, userName, onLogout }: Inn
 
           <VehicleTypeSelector current={profile.vehicleType} onChanged={(p) => setProfile(p)} />
 
+          <Link
+            href="/delivery/analytics"
+            aria-label="Analytics"
+            className="text-white hover:bg-white/10 p-2 rounded-md"
+          >
+            <TrendingUp className="h-5 w-5" />
+          </Link>
+
           <Button variant="ghost" size="icon" aria-label="Logout" onClick={onLogout} className="text-white hover:bg-white/10">
             <LogOut className="h-5 w-5" />
           </Button>
