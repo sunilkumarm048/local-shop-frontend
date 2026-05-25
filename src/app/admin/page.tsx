@@ -12,6 +12,8 @@ import {
   ListOrdered,
   Tags,
   Shield,
+  IndianRupee,
+  Banknote,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -24,8 +26,10 @@ import { AdminShopsTab } from '@/components/admin/AdminShopsTab';
 import { AdminUsersTab } from '@/components/admin/AdminUsersTab';
 import { AdminOrdersTab } from '@/components/admin/AdminOrdersTab';
 import { AdminCategoriesTab } from '@/components/admin/AdminCategoriesTab';
+import AdminPricingTab from '@/components/admin/AdminPricingTab';
+import AdminWithdrawalsTab from '@/components/admin/AdminWithdrawalsTab';
 
-type Section = 'overview' | 'shops' | 'users' | 'orders' | 'categories';
+type Section = 'overview' | 'shops' | 'users' | 'orders' | 'categories' | 'pricing' | 'withdrawals';
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -35,7 +39,6 @@ export default function AdminDashboard() {
   const [hydrated, setHydrated] = useState(false);
   const [section, setSection] = useState<Section>('overview');
 
-  // Standard hydration gate
   useEffect(() => {
     setHydrated(useAuth.persist.hasHydrated());
     return useAuth.persist.onFinishHydration(() => setHydrated(true));
@@ -94,6 +97,8 @@ export default function AdminDashboard() {
           {section === 'users' && <AdminUsersTab currentUserId={user.id} />}
           {section === 'orders' && <AdminOrdersTab />}
           {section === 'categories' && <AdminCategoriesTab />}
+          {section === 'pricing' && <AdminPricingTab />}
+          {section === 'withdrawals' && <AdminWithdrawalsTab />}
         </div>
       </main>
     </div>
@@ -112,6 +117,8 @@ function SectionNav({ current, onChange }: NavProps) {
     { id: 'users', label: 'Users', icon: Users },
     { id: 'orders', label: 'Orders', icon: ListOrdered },
     { id: 'categories', label: 'Categories', icon: Tags },
+    { id: 'pricing', label: 'Pricing', icon: IndianRupee },
+    { id: 'withdrawals', label: 'Withdrawals', icon: Banknote },
   ];
   return (
     <nav className="flex gap-1 border-b overflow-x-auto">
@@ -145,4 +152,3 @@ function FullPageLoader({ label }: { label: string }) {
     </div>
   );
 }
-  
