@@ -129,9 +129,10 @@ export async function markOnWay(orderId: string) {
   });
 }
 
-export async function markDelivered(orderId: string) {
+export async function markDelivered(orderId: string, opts: { proofImageUrl?: string } = {}) {
   return api<{ order: MyJob }>(`/delivery/jobs/${orderId}/deliver`, {
     method: 'POST',
+    body: opts.proofImageUrl ? { proofImageUrl: opts.proofImageUrl } : undefined,
     token: token(),
   });
 }
