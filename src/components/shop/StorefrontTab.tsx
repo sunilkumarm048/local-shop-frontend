@@ -23,6 +23,7 @@ import {
 import { updateShop } from '@/lib/owner';
 import { ApiError } from '@/lib/api';
 import type { Shop } from '@/lib/shops';
+import { ImageUploader } from '@/components/uploads/ImageUploader';
 
 const editSchema = z.object({
   name: z.string().trim().min(2).max(80),
@@ -179,17 +180,29 @@ function EditDialog({ open, onOpenChange, shop, onSaved }: EditDialogProps) {
             <Label htmlFor="e-phone">Phone</Label>
             <Input id="e-phone" type="tel" {...form.register('phone')} />
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="e-logo">Logo URL</Label>
-              <Input id="e-logo" type="url" {...form.register('logo')} />
+          <div className="space-y-3">
+            <div>
+              <Label>Shop logo</Label>
+              <ImageUploader
+                value={form.watch('logo') || ''}
+                onChange={(url) => form.setValue('logo', url, { shouldValidate: true, shouldDirty: true })}
+                kind="shop"
+                variant="thumbnail"
+              />
               {form.formState.errors.logo && (
                 <p className="text-xs text-destructive">{form.formState.errors.logo.message}</p>
               )}
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="e-cover">Cover URL</Label>
-              <Input id="e-cover" type="url" {...form.register('coverImage')} />
+            <div>
+              <Label>Cover image</Label>
+              <ImageUploader
+                value={form.watch('coverImage') || ''}
+                onChange={(url) =>
+                  form.setValue('coverImage', url, { shouldValidate: true, shouldDirty: true })
+                }
+                kind="shop"
+                variant="banner"
+              />
               {form.formState.errors.coverImage && (
                 <p className="text-xs text-destructive">
                   {form.formState.errors.coverImage.message}
