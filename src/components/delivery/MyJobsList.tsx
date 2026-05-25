@@ -12,6 +12,7 @@ import {
   CheckCircle2,
   Store,
   Navigation,
+  Camera,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -20,6 +21,7 @@ import { Badge } from '@/components/ui/badge';
 import { ApiError } from '@/lib/api';
 import { markPickedUp, markOnWay, markDelivered, type MyJob } from '@/lib/delivery';
 import type { OrderStatus } from '@/lib/owner-orders';
+import { ImageUploader } from '@/components/uploads/ImageUploader';
 
 // Leaflet touches window at import time — dynamic with ssr:false.
 const DeliveryMap = dynamic(() => import('./DeliveryMap'), {
@@ -248,16 +250,95 @@ function MyJobCard({
           </Button>
         )}
         {job.status === 'out_for_delivery' && (
-          <Button className="w-full" disabled={busy} onClick={() => run(() => markDelivered(job._id))}>
-            {busy ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <CheckCircle2 className="h-4 w-4 mr-2" />
-            )}
-            Mark delivered
-          </Button>
+          <DeliverWithProof
+            jobId={job._id}
+            busy={busy}
+            onDelivered={(proofImageUrl) =>
+              run(() => markDelivered(job._id, { proofImageUrl: proofImageUrl || undefined }))
+            }
+          />
         )}
       </CardContent>
     </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+
+/**
+ * Expandable proof-of-delivery flow.
+ *
+ * Default: shows "Mark delivered" button as before. Tapping "Add photo"
+ * reveals an inline ImageUploader. After upload completes, the customer can
+ * tap "Confirm with photo". Skip is always allowed — proof is optional.
+ */
+function DeliverWithProof({
+  jobId,
+  busy,
+  onDelivered,
+}: {
+  jobId: string;
+  busy: boolean;
+  onDelivered: (proofImageUrl: string) => void;
+}) {
+  const [proofUrl, setProofUrl] = useState('');
+  const [showUploader, setShowUploader] = useState(false);
+
+  if (!showUploader && !proofUrl) {
+    return (
+      <div className="space-y-2">
+        <Button className="w-full" disabled={busy} onClick={() => onDelivered('')}>
+          {busy ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <CheckCircle2 className="h-4 w-4 mr-2" />
+          )}
+          Mark delivered
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full"
+          size="sm"
+          onClick={() => setShowUploader(true)}
+          disabled={busy}
+        >
+          <Camera className="h-4 w-4 mr-2" />
+          Add proof photo (optional)
+        </Button>
+        <p className="text-[10px] text-muted-foreground text-center">
+          A photo of the delivered package helps resolve disputes later.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2 bg-muted/30 rounded-md p-3">
+      <ImageUploader
+        value={proofUrl}
+        onChange={setProofUrl}
+        kind="proof"
+        label={`Proof of delivery for #${jobId.slice(-6).toUpperCase()}`}
+        variant="banner"
+      />
+      <div className="flex gap-2">
+        <Button
+          className="flex-1"
+          disabled={busy || !proofUrl}
+          onClick={() => onDelivered(proofUrl)}
+        >
+          {busy ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <CheckCircle2 className="h-4 w-4 mr-2" />
+          )}
+          Confirm with photo
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => onDelivered('')} disabled={busy}>
+          Skip photo
+        </Button>
+      </div>
+    </div>
   );
 }
