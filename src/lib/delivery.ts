@@ -128,3 +128,43 @@ export async function markDelivered(orderId: string) {
     token: token(),
   });
 }
+
+// ============================================================
+// PHASE 7a — Partner-side withdrawal
+// ============================================================
+
+export type WithdrawStatus = 'pending' | 'approved' | 'paid' | 'rejected';
+
+export interface WithdrawRequest {
+  _id: string;
+  amount: number;
+  method: 'upi' | 'bank';
+  upiId?: string;
+  bankDetails?: { accountName: string; accountNumber: string; ifsc: string };
+  status: WithdrawStatus;
+  transactionRef?: string;
+  rejectionReason?: string;
+  createdAt: string;
+  processedAt?: string;
+}
+
+export interface SubmitWithdrawInput {
+  amount: number;
+  method: 'upi' | 'bank';
+  upiId?: string;
+  bankDetails?: { accountName: string; accountNumber: string; ifsc: string };
+}
+
+export async function submitWithdrawal(input: SubmitWithdrawInput) {
+  return api<{ request: WithdrawRequest; profile: DeliveryProfile }>('/delivery/withdrawals', {
+    method: 'POST',
+    body: input,
+    token: token(),
+  });
+}
+
+export async function fetchMyWithdrawals() {
+  return api<{ requests: WithdrawRequest[] }>('/delivery/withdrawals/mine', {
+    token: token(),
+  });
+}
