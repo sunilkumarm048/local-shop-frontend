@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Loader2, MapPin } from 'lucide-react';
+import { ArrowLeft, Loader2, MapPin, Truck } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,6 +17,7 @@ import { getCurrentPosition } from '@/lib/geo';
 import { fetchQuote, checkout, verifyPayment } from '@/lib/orders';
 import { openRazorpayCheckout } from '@/lib/razorpay';
 import { ApiError } from '@/lib/api';
+import { getCartWeightKg, getRecommendedVehicle, VEHICLE_DISPLAY } from '@/lib/weight';
 
 type Quote = Awaited<ReturnType<typeof fetchQuote>>;
 
@@ -54,6 +55,17 @@ export default function CheckoutPage() {
       if (c) setCoords({ lng: c.longitude, lat: c.latitude });
     });
   }, []);
+
+  // 7a: Compute total cart weight and auto-recommend a vehicle.
+  // Re-runs whenever items or quantities change. The setter (setVehicleId)
+  // is called from inside a useEffect so it doesn't fire on every render.
+  const cartWeightKg = getCartWeightKg(
+    cart.items.map((i) => ({ qty: i.qty, weight: i.weight }))
+  );
+  useEffect(() => {
+    const recommended = getRecommendedVehicle(cartWeightKg);
+    setVehicleId(recommended);
+  }, [cartWeightKg]);
 
   // Re-quote whenever cart, vehicle, or drop changes
   useEffect(() => {
@@ -242,6 +254,28 @@ export default function CheckoutPage() {
               {coords
                 ? `Drop pin: ${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)}`
                 : 'Waiting for location...'}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* 7a: Vehicle auto-suggestion banner */}
+        <Card>
+          <CardContent className="pt-4">
+            <div className="flex items-start gap-3">
+              <div className="h-10 w-10 rounded-full bg-brand-greenLight flex items-center justify-center text-xl shrink-0">
+                {VEHICLE_DISPLAY[vehicleId]?.icon || '🚚'}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                  Delivery vehicle
+                </div>
+                <div className="font-semibold text-sm">{VEHICLE_DISPLAY[vehicleId]?.name || vehicleId}</div>
+                <div className="text-xs text-muted-foreground">
+                  Auto-selected based on cart weight (~{cartWeightKg.toFixed(2)} kg).
+                  {vehicleId !== 'bike' && ' Larger vehicle assigned for heavier loads.'}
+                </div>
+              </div>
+              <Truck className="h-5 w-5 text-muted-foreground shrink-0" />
             </div>
           </CardContent>
         </Card>
