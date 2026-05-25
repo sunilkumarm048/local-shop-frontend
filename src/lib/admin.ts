@@ -32,7 +32,7 @@ export interface AdminUser {
 }
 
 /** Shop with admin-only fields surfaced (owner populated). */
-export interface AdminShop extends Shop {
+export interface AdminShop extends Omit<Shop, 'owner'> {
   owner?: { _id: string; name?: string; email?: string; phone?: string };
   adminNote?: string;
   // Admin-only moderation flags. Server populates these from the Shop document
