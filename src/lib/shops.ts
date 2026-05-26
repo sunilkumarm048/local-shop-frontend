@@ -7,6 +7,7 @@ export interface Shop {
   coverImage?: string;
   description?: string;
   category?: string;
+  phone?: string;
   isOpen: boolean;
   rating: number;
   ratingCount: number;
