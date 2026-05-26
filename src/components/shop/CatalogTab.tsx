@@ -293,3 +293,4 @@ export function CatalogTab({ shopId, onCloned }: Props) {
     </div>
   );
 }
+  
