@@ -17,6 +17,7 @@ import {
   Percent,
   Package,
   ShieldCheck,
+  PackagePlus,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -34,6 +35,7 @@ import AdminWithdrawalsTab from '@/components/admin/AdminWithdrawalsTab';
 import AdminShopDiscountsTab from '@/components/admin/AdminShopDiscountsTab';
 import AdminManageProductsTab from '@/components/admin/AdminManageProductsTab';
 import AdminDocVerificationTab from '@/components/admin/AdminDocVerificationTab';
+import AdminTemplatesTab from '@/components/admin/AdminTemplatesTab';
 
 type Section =
   | 'overview'
@@ -45,7 +47,8 @@ type Section =
   | 'withdrawals'
   | 'discounts'
   | 'products'
-  | 'verifications';
+  | 'verifications'
+  | 'templates';
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -118,6 +121,7 @@ export default function AdminDashboard() {
           {section === 'discounts' && <AdminShopDiscountsTab />}
           {section === 'products' && <AdminManageProductsTab />}
           {section === 'verifications' && <AdminDocVerificationTab />}
+          {section === 'templates' && <AdminTemplatesTab />}
         </div>
       </main>
     </div>
@@ -141,6 +145,7 @@ function SectionNav({ current, onChange }: NavProps) {
     { id: 'products', label: 'Products', icon: Package },
     { id: 'withdrawals', label: 'Withdrawals', icon: Banknote },
     { id: 'verifications', label: 'Verifications', icon: ShieldCheck },
+    { id: 'templates', label: 'Templates', icon: PackagePlus },
   ];
   return (
     <nav className="flex gap-1 border-b overflow-x-auto">
