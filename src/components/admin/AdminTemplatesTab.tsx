@@ -1,4 +1,4 @@
-'use client';
+ 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
 import {
@@ -9,6 +9,7 @@ import {
   IndianRupee,
   Eye,
   EyeOff,
+  ImageIcon,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -24,6 +25,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { ApiError } from '@/lib/api';
+import { ImageUploader } from '@/components/uploads/ImageUploader';
 import {
   fetchAdminTemplates,
   createTemplate,
@@ -142,8 +144,21 @@ export default function AdminTemplatesTab() {
             {grouped[g].map((tpl) => (
               <Card key={tpl._id} className={tpl.isActive === false ? 'opacity-60' : ''}>
                 <CardContent className="pt-3 pb-3 space-y-2">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
+                  <div className="flex items-start gap-2">
+                    {/* Image thumbnail (or placeholder icon) */}
+                    {tpl.image ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={tpl.image}
+                        alt=""
+                        className="h-10 w-10 rounded-md object-cover border shrink-0"
+                      />
+                    ) : (
+                      <div className="h-10 w-10 rounded-md border bg-muted flex items-center justify-center shrink-0">
+                        <ImageIcon className="h-4 w-4 text-muted-foreground/50" />
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
                       <div className="font-medium text-sm truncate">{tpl.name}</div>
                       <div className="text-xs text-muted-foreground flex items-center gap-2 flex-wrap">
                         {tpl.weight && <span>{tpl.weight}</span>}
@@ -212,6 +227,7 @@ function TemplateDialog({ open, onOpenChange, template, onSaved }: DialogProps) 
   const [weight, setWeight] = useState('');
   const [suggestedPrice, setSuggestedPrice] = useState(0);
   const [group, setGroup] = useState('');
+  const [image, setImage] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -222,11 +238,13 @@ function TemplateDialog({ open, onOpenChange, template, onSaved }: DialogProps) 
       setWeight(template.weight || '');
       setSuggestedPrice(template.suggestedPrice);
       setGroup(template.group);
+      setImage(template.image || '');
     } else {
       setName('');
       setWeight('');
       setSuggestedPrice(0);
       setGroup('');
+      setImage('');
     }
     setError(null);
   }, [open, template]);
@@ -244,6 +262,7 @@ function TemplateDialog({ open, onOpenChange, template, onSaved }: DialogProps) 
         weight: weight.trim() || undefined,
         suggestedPrice,
         group: group.trim(),
+        image: image || undefined,
       };
       if (template) {
         await updateTemplate(template._id, payload);
@@ -294,6 +313,18 @@ function TemplateDialog({ open, onOpenChange, template, onSaved }: DialogProps) 
               placeholder="e.g. Grains, Pulses, Spices…"
             />
           </div>
+          <div className="space-y-1">
+            <Label>Product image (optional)</Label>
+            <ImageUploader
+              value={image}
+              onChange={(url) => setImage(url)}
+              kind="product"
+              variant="thumbnail"
+            />
+            <p className="text-[10px] text-muted-foreground">
+              Shop owners who clone this template will get this image on their product. They can replace it after cloning.
+            </p>
+          </div>
           {error && (
             <div className="text-xs text-destructive bg-destructive/10 rounded px-2 py-1.5">{error}</div>
           )}
@@ -311,4 +342,3 @@ function TemplateDialog({ open, onOpenChange, template, onSaved }: DialogProps) 
     </Dialog>
   );
 }
-  
