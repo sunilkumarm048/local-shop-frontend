@@ -26,6 +26,7 @@ import {
   deleteCategory,
 } from '@/lib/admin';
 import type { Category } from '@/lib/shops';
+import { ImageUploader } from '@/components/uploads/ImageUploader';
 
 const schema = z.object({
   name: z.string().trim().min(1, 'Required').max(60),
@@ -389,8 +390,13 @@ function CategoryDialog({ open, onOpenChange, category, allCategories, onSaved }
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="c-image">Image URL</Label>
-            <Input id="c-image" type="url" {...form.register('image')} placeholder="https://..." />
+            <Label>Image (optional banner)</Label>
+            <ImageUploader
+              value={form.watch('image') || ''}
+              onChange={(url) => form.setValue('image', url, { shouldValidate: true, shouldDirty: true })}
+              kind="shop"
+              variant="thumbnail"
+            />
             {form.formState.errors.image && (
               <p className="text-xs text-destructive">{form.formState.errors.image.message}</p>
             )}
