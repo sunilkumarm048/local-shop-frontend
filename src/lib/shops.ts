@@ -1,42 +1,25 @@
 import { api } from './api';
 
-export interface ShopAddress {
-  line1?: string;
-  line2?: string;
-  city?: string;
-  state?: string;
-  pincode?: string;
-}
-
-export interface OpeningHour {
-  day: number; // 0 = Sun
-  open: string; // "09:00"
-  close: string; // "21:00"
-}
-
 export interface Shop {
   _id: string;
   name: string;
-  slug?: string;
-  owner?: string;
-  ownerEmail?: string;
   logo?: string;
   coverImage?: string;
   description?: string;
-  phone?: string;
   category?: string;
   isOpen: boolean;
-  isApproved?: boolean;
   rating: number;
   ratingCount: number;
-  openingHours?: OpeningHour[];
-  address?: ShopAddress;
+  address?: {
+    line1?: string;
+    city?: string;
+    state?: string;
+    pincode?: string;
+  };
   location: {
     type: 'Point';
     coordinates: [number, number]; // [lng, lat]
   };
-  createdAt?: string;
-  updatedAt?: string;
 }
 
 export interface Product {
@@ -45,16 +28,11 @@ export interface Product {
   name: string;
   description?: string;
   image?: string;
-  images?: string[];
-  category?: string;
   price: number;
   mrp?: number;
   weight?: string;
   stock: number;
   inStock: boolean;
-  isActive?: boolean;
-  createdAt?: string;
-  updatedAt?: string;
 }
 
 export interface Category {
@@ -62,6 +40,20 @@ export interface Category {
   name: string;
   icon?: string;
   image?: string;
+  sortOrder?: number;
+  isActive?: boolean;
+  // 8b: nesting. Null/missing on top-level groups, ObjectId string on children.
+  // The admin GET endpoint populates this with { _id, name } objects;
+  // public GET returns it as a plain id string.
+  parent?: string | { _id: string; name: string } | null;
+}
+
+/**
+ * Tree-shape variant returned by `/api/shops/categories?tree=true`.
+ * Top-level groups carry a `children` array of their direct subcategories.
+ */
+export interface CategoryNode extends Category {
+  children: Category[];
 }
 
 export async function fetchNearbyShops(params: {
@@ -83,6 +75,14 @@ export async function fetchNearbyShops(params: {
 
 export async function fetchCategories() {
   return api<{ categories: Category[] }>('/shops/categories');
+}
+
+/**
+ * 8b: returns the category tree (parents at top, each with a `children` array).
+ * Used by the customer browse page to render group → subcategory navigation.
+ */
+export async function fetchCategoryTree() {
+  return api<{ categories: CategoryNode[] }>('/shops/categories?tree=true');
 }
 
 export async function fetchShop(id: string) {
