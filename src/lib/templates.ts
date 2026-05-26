@@ -107,3 +107,4 @@ export async function deleteTemplate(id: string) {
     token: token(),
   });
 }
+  
