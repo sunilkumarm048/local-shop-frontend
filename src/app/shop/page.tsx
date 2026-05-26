@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Loader2, LogOut, Package, Store, ListOrdered, TrendingUp } from 'lucide-react';
+import { Loader2, LogOut, Package, Store, ListOrdered, TrendingUp, PackagePlus } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/stores/auth';
@@ -18,8 +18,9 @@ import { StorefrontTab } from '@/components/shop/StorefrontTab';
 import { ProductsTab } from '@/components/shop/ProductsTab';
 import { OrdersTab } from '@/components/shop/OrdersTab';
 import { ShopAnalyticsTab } from '@/components/shop/ShopAnalyticsTab';
+import { CatalogTab } from '@/components/shop/CatalogTab';
 
-type Section = 'storefront' | 'products' | 'orders' | 'analytics';
+type Section = 'storefront' | 'products' | 'catalog' | 'orders' | 'analytics';
 
 export default function ShopDashboard() {
   const router = useRouter();
@@ -129,6 +130,7 @@ export default function ShopDashboard() {
             />
           )}
           {section === 'products' && <ProductsTab shopId={shop._id} />}
+          {section === 'catalog' && <CatalogTab shopId={shop._id} />}
           {section === 'orders' && <OrdersTab shopId={shop._id} />}
           {section === 'analytics' && <ShopAnalyticsTab />}
         </div>
@@ -246,6 +248,7 @@ function SectionNav({ current, onChange }: NavProps) {
   const items: Array<{ id: Section; label: string; icon: typeof Store }> = [
     { id: 'storefront', label: 'Storefront', icon: Store },
     { id: 'products', label: 'Products', icon: Package },
+    { id: 'catalog', label: 'Catalog', icon: PackagePlus },
     { id: 'orders', label: 'Orders', icon: ListOrdered },
     { id: 'analytics', label: 'Analytics', icon: TrendingUp },
   ];
