@@ -311,3 +311,4 @@ function TemplateDialog({ open, onOpenChange, template, onSaved }: DialogProps) 
     </Dialog>
   );
 }
+  
