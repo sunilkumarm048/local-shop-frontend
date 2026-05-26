@@ -33,6 +33,8 @@ const schema = z.object({
   image: z.string().url('Must be a URL').optional().or(z.literal('')),
   sortOrder: z.coerce.number().int().optional(),
   isActive: z.boolean().optional(),
+  // '' means top-level group; otherwise it's a parent _id.
+  parent: z.string().optional(),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -99,22 +101,103 @@ export function AdminCategoriesTab() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {categories.map((c) => (
-            <CategoryCard key={c._id} category={c} onEdit={() => openEdit(c)} />
-          ))}
-        </div>
+        <GroupedCategoryList categories={categories} onEdit={openEdit} />
       )}
 
       <CategoryDialog
         open={open}
         onOpenChange={setOpen}
         category={editing}
+        allCategories={categories || []}
         onSaved={async () => {
           setOpen(false);
           await refresh();
         }}
       />
+    </div>
+  );
+}
+
+/**
+ * Groups categories by parent. Top-level groups render as section headers
+ * with their direct children listed underneath. Orphans (parent missing
+ * from active set) fall under an "Other" section.
+ */
+function GroupedCategoryList({
+  categories,
+  onEdit,
+}: {
+  categories: Category[];
+  onEdit: (c: Category) => void;
+}) {
+  // Parent here comes from the admin API populated, so `parent` is either
+  // null/undefined OR an object { _id, name }.
+  const tops = categories.filter((c) => !c.parent);
+  const childrenByParent = new Map<string, Category[]>();
+  const orphans: Category[] = [];
+  const topIds = new Set(tops.map((t) => t._id));
+
+  for (const c of categories) {
+    if (!c.parent) continue;
+    const parentId = typeof c.parent === 'string' ? c.parent : c.parent._id;
+    if (!topIds.has(parentId)) {
+      orphans.push(c);
+      continue;
+    }
+    if (!childrenByParent.has(parentId)) childrenByParent.set(parentId, []);
+    childrenByParent.get(parentId)!.push(c);
+  }
+
+  if (tops.length === 0) {
+    return (
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {categories.map((c) => (
+          <CategoryCard key={c._id} category={c} onEdit={() => onEdit(c)} />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {tops.map((top) => {
+        const kids = childrenByParent.get(top._id) || [];
+        return (
+          <section key={top._id} className="space-y-2">
+            <div className="flex items-center gap-2 px-1">
+              <span className="text-lg" aria-hidden>{top.icon || '📦'}</span>
+              <h3 className="text-sm font-semibold">{top.name}</h3>
+              <span className="text-xs text-muted-foreground">
+                ({kids.length} {kids.length === 1 ? 'subcategory' : 'subcategories'})
+              </span>
+              <Button variant="ghost" size="sm" className="ml-auto h-7 text-xs" onClick={() => onEdit(top)}>
+                <Pencil className="h-3 w-3 mr-1" />
+                Edit group
+              </Button>
+            </div>
+            {kids.length > 0 && (
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 pl-6">
+                {kids.map((c) => (
+                  <CategoryCard key={c._id} category={c} onEdit={() => onEdit(c)} />
+                ))}
+              </div>
+            )}
+          </section>
+        );
+      })}
+
+      {orphans.length > 0 && (
+        <section className="space-y-2">
+          <div className="flex items-center gap-2 px-1">
+            <h3 className="text-sm font-semibold text-orange-600">Other (parent missing)</h3>
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 pl-6">
+            {orphans.map((c) => (
+              <CategoryCard key={c._id} category={c} onEdit={() => onEdit(c)} />
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }
@@ -171,12 +254,19 @@ interface DialogProps {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   category: Category | null;
+  allCategories: Category[];
   onSaved: () => void | Promise<void>;
 }
 
-function CategoryDialog({ open, onOpenChange, category, onSaved }: DialogProps) {
+function CategoryDialog({ open, onOpenChange, category, allCategories, onSaved }: DialogProps) {
   const [serverError, setServerError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  // Top-level groups only — children can't have children (one-level limit).
+  // When editing a parent, exclude itself to prevent self-reference.
+  const parentOptions = allCategories.filter(
+    (c) => !c.parent && (!category || c._id !== category._id)
+  );
 
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -186,21 +276,28 @@ function CategoryDialog({ open, onOpenChange, category, onSaved }: DialogProps) 
       image: '',
       sortOrder: 0,
       isActive: true,
+      parent: '',
     },
   });
 
   useEffect(() => {
     if (!open) return;
     if (category) {
+      const currentParentId = !category.parent
+        ? ''
+        : typeof category.parent === 'string'
+          ? category.parent
+          : category.parent._id;
       form.reset({
         name: category.name,
         icon: category.icon || '',
         image: category.image || '',
         sortOrder: (category as Category & { sortOrder?: number }).sortOrder ?? 0,
         isActive: (category as Category & { isActive?: boolean }).isActive ?? true,
+        parent: currentParentId,
       });
     } else {
-      form.reset({ name: '', icon: '', image: '', sortOrder: 0, isActive: true });
+      form.reset({ name: '', icon: '', image: '', sortOrder: 0, isActive: true, parent: '' });
     }
     setServerError(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -215,6 +312,7 @@ function CategoryDialog({ open, onOpenChange, category, onSaved }: DialogProps) 
         image: data.image || undefined,
         sortOrder: data.sortOrder,
         isActive: data.isActive,
+        parent: data.parent ? data.parent : null,
       };
       if (category) await updateCategory(category._id, payload);
       else await createCategory(payload);
@@ -269,6 +367,25 @@ function CategoryDialog({ open, onOpenChange, category, onSaved }: DialogProps) 
                 {...form.register('sortOrder')}
               />
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="c-parent">Parent group</Label>
+            <select
+              id="c-parent"
+              {...form.register('parent')}
+              className="w-full px-3 py-2 border rounded-md text-sm bg-background"
+            >
+              <option value="">— Top-level group (no parent) —</option>
+              {parentOptions.map((p) => (
+                <option key={p._id} value={p._id}>
+                  {p.icon ? `${p.icon} ` : ''}{p.name}
+                </option>
+              ))}
+            </select>
+            <p className="text-[10px] text-muted-foreground">
+              Pick a parent to nest this under it. Top-level groups have no parent.
+            </p>
           </div>
 
           <div className="space-y-2">
