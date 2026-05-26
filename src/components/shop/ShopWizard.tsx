@@ -12,10 +12,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { createShop, fetchCategories } from '@/lib/owner';
+import { createShop } from '@/lib/owner';
+import { fetchCategoryTree } from '@/lib/shops';
 import { ApiError } from '@/lib/api';
 import type { AddressHints, LatLng } from './LocationPicker';
-import type { Category, Shop } from '@/lib/shops';
+import type { CategoryNode, Shop } from '@/lib/shops';
+import { ImageUploader } from '@/components/uploads/ImageUploader';
 
 // Leaflet touches `window` at import time — dynamic-import with ssr:false.
 const LocationPicker = dynamic(() => import('./LocationPicker'), {
@@ -52,7 +54,7 @@ interface Props {
 export function ShopWizard({ onCreated }: Props) {
   const [location, setLocation] = useState<LatLng | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [categories, setCategories] = useState<CategoryNode[]>([]);
   const [serverError, setServerError] = useState<string | null>(null);
 
   const form = useForm<FormData>({
@@ -69,7 +71,7 @@ export function ShopWizard({ onCreated }: Props) {
   });
 
   useEffect(() => {
-    fetchCategories()
+    fetchCategoryTree()
       .then((r) => setCategories(r.categories))
       .catch(() => setCategories([]));
   }, []);
@@ -181,31 +183,59 @@ export function ShopWizard({ onCreated }: Props) {
                   {...form.register('category')}
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
-                  <option value="">— Select —</option>
-                  {categories.map((c) => (
-                    <option key={c._id} value={c._id}>
-                      {c.name}
-                    </option>
-                  ))}
+                  <option value="">— Select your shop type —</option>
+                  {/* 8b: nested categories rendered as <optgroup> labeled with
+                      the parent group; only children (subcategories) are
+                      selectable, which keeps shop data clean and analytics
+                      precise. If a top-level group has no children yet, we
+                      still surface it as a selectable option so it isn't lost. */}
+                  {categories.map((group) =>
+                    group.children.length > 0 ? (
+                      <optgroup
+                        key={group._id}
+                        label={`${group.icon ? group.icon + ' ' : ''}${group.name}`}
+                      >
+                        {group.children.map((c) => (
+                          <option key={c._id} value={c._id}>
+                            {c.icon ? `${c.icon} ` : ''}{c.name}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ) : (
+                      <option key={group._id} value={group._id}>
+                        {group.icon ? `${group.icon} ` : ''}{group.name}
+                      </option>
+                    )
+                  )}
                 </select>
+                <p className="text-[10px] text-muted-foreground">
+                  Pick the specific shop type that best fits your business.
+                </p>
               </div>
             </div>
 
-            <div className="grid sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="logo">Logo URL</Label>
-                <Input id="logo" {...form.register('logo')} placeholder="https://..." type="url" />
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <Label>Shop logo</Label>
+                <ImageUploader
+                  value={form.watch('logo') || ''}
+                  onChange={(url) => form.setValue('logo', url, { shouldValidate: true, shouldDirty: true })}
+                  kind="shop"
+                  variant="thumbnail"
+                />
                 {form.formState.errors.logo && (
                   <p className="text-xs text-destructive">{form.formState.errors.logo.message}</p>
                 )}
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="coverImage">Cover image URL</Label>
-                <Input
-                  id="coverImage"
-                  {...form.register('coverImage')}
-                  placeholder="https://..."
-                  type="url"
+              <div className="space-y-1">
+                <Label>Cover image</Label>
+                <ImageUploader
+                  value={form.watch('coverImage') || ''}
+                  onChange={(url) =>
+                    form.setValue('coverImage', url, { shouldValidate: true, shouldDirty: true })
+                  }
+                  kind="shop"
+                  variant="banner"
                 />
                 {form.formState.errors.coverImage && (
                   <p className="text-xs text-destructive">
@@ -214,9 +244,6 @@ export function ShopWizard({ onCreated }: Props) {
                 )}
               </div>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Paste any public image URL for now. Cloudinary upload is on the next ship list.
-            </p>
           </section>
 
           {/* Location pin — placed BEFORE address so reverse-geocode autofills below */}
