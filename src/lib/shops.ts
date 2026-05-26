@@ -34,6 +34,9 @@ export interface Product {
   weight?: string;
   stock: number;
   inStock: boolean;
+  // Admin/owner can soft-hide products via the Phase 7c admin Products tab.
+  // Defaults true server-side; absent from old documents created before 7c.
+  isActive?: boolean;
 }
 
 export interface Category {
