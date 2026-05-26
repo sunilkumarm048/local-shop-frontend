@@ -152,6 +152,9 @@ export interface CategoryPayload {
   image?: string;
   sortOrder?: number;
   isActive?: boolean;
+  // 8b: null = top-level group. ObjectId string = child of that parent.
+  // Omit the field entirely to leave unchanged on PATCH.
+  parent?: string | null;
 }
 
 export async function createCategory(payload: CategoryPayload) {
