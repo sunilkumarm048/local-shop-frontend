@@ -7,11 +7,12 @@ import { MapPin, Search, Star } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { getCurrentPosition } from '@/lib/geo';
-import { fetchNearbyShops, fetchCategories, type Shop, type Category } from '@/lib/shops';
+import { fetchNearbyShops, fetchCategoryTree, type Shop, type CategoryNode } from '@/lib/shops';
 
 export default function CustomerHome() {
   const [shops, setShops] = useState<Shop[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [tree, setTree] = useState<CategoryNode[]>([]);
+  const [activeGroup, setActiveGroup] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [coords, setCoords] = useState<{ lng: number; lat: number } | null>(null);
@@ -25,10 +26,10 @@ export default function CustomerHome() {
     });
   }, []);
 
-  // Load categories once
+  // Load category tree once
   useEffect(() => {
-    fetchCategories()
-      .then((r) => setCategories(r.categories))
+    fetchCategoryTree()
+      .then((r) => setTree(r.categories))
       .catch(() => {});
   }, []);
 
@@ -73,33 +74,75 @@ export default function CustomerHome() {
         </div>
       </div>
 
-      {/* Category strip */}
-      {categories.length > 0 && (
-        <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-none">
-          <button
-            onClick={() => setActiveCategory(null)}
-            className={`shrink-0 px-3 py-1.5 rounded-full text-sm font-medium border ${
-              activeCategory === null
-                ? 'bg-primary text-primary-foreground border-primary'
-                : 'bg-card border-border hover:bg-muted'
-            }`}
-          >
-            All
-          </button>
-          {categories.map((c) => (
+      {/* Category groups — top-level strip */}
+      {tree.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-none">
             <button
-              key={c._id}
-              onClick={() => setActiveCategory(c._id)}
+              onClick={() => {
+                setActiveGroup(null);
+                setActiveCategory(null);
+              }}
               className={`shrink-0 px-3 py-1.5 rounded-full text-sm font-medium border ${
-                activeCategory === c._id
+                activeGroup === null
                   ? 'bg-primary text-primary-foreground border-primary'
                   : 'bg-card border-border hover:bg-muted'
               }`}
             >
-              {c.icon && <span className="mr-1">{c.icon}</span>}
-              {c.name}
+              All
             </button>
-          ))}
+            {tree.map((g) => (
+              <button
+                key={g._id}
+                onClick={() => {
+                  setActiveGroup(activeGroup === g._id ? null : g._id);
+                  setActiveCategory(null); // reset subcategory when switching groups
+                }}
+                className={`shrink-0 px-3 py-1.5 rounded-full text-sm font-medium border ${
+                  activeGroup === g._id
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'bg-card border-border hover:bg-muted'
+                }`}
+              >
+                {g.icon && <span className="mr-1">{g.icon}</span>}
+                {g.name}
+              </button>
+            ))}
+          </div>
+
+          {/* Subcategory strip — appears only when a group is selected */}
+          {activeGroup && (() => {
+            const group = tree.find((g) => g._id === activeGroup);
+            if (!group || group.children.length === 0) return null;
+            return (
+              <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-none border-t pt-2">
+                <button
+                  onClick={() => setActiveCategory(null)}
+                  className={`shrink-0 px-3 py-1 rounded-full text-xs font-medium border ${
+                    activeCategory === null
+                      ? 'bg-brand-green text-white border-brand-green'
+                      : 'bg-card border-border hover:bg-muted'
+                  }`}
+                >
+                  All {group.name}
+                </button>
+                {group.children.map((c) => (
+                  <button
+                    key={c._id}
+                    onClick={() => setActiveCategory(c._id)}
+                    className={`shrink-0 px-3 py-1 rounded-full text-xs font-medium border ${
+                      activeCategory === c._id
+                        ? 'bg-brand-green text-white border-brand-green'
+                        : 'bg-card border-border hover:bg-muted'
+                    }`}
+                  >
+                    {c.icon && <span className="mr-1">{c.icon}</span>}
+                    {c.name}
+                  </button>
+                ))}
+              </div>
+            );
+          })()}
         </div>
       )}
 
