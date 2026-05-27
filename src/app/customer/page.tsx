@@ -19,12 +19,18 @@ import {
 import { DeliveryLocationBar } from '@/components/customer/DeliveryLocationBar';
 import { useDeliveryLocation } from '@/stores/deliveryLocation';
 import { useCart } from '@/stores/cart';
+import {
+  ClothingFiltersSidebar,
+  ClothingFiltersMobile,
+  EMPTY_FILTERS,
+  type FiltersState,
+  type SortKey,
+} from '@/components/customer/ClothingFiltersSidebar';
 
 /* ----------------------------------------------------------------------- */
 /* Helpers                                                                  */
 /* ----------------------------------------------------------------------- */
 
-/** Great-circle distance in km between two lat/lng points. */
 function haversineKm(
   lat1: number,
   lng1: number,
@@ -42,7 +48,6 @@ function haversineKm(
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-/** Fetch products for many shops in parallel, return [{ shop, products[] }]. */
 async function fetchProductsForShops(
   shopIds: string[]
 ): Promise<Map<string, Product[]>> {
@@ -60,8 +65,28 @@ async function fetchProductsForShops(
   return map;
 }
 
-/** Cap how many shops we hit for the All Products feed (keeps it snappy). */
 const MAX_SHOPS_FOR_PRODUCTS = 6;
+
+/**
+ * Is this top-level group the Clothing & Fashion one?
+ *
+ * Backend assigns _ids dynamically so we can't hardcode; the safest stable
+ * key is a name match. Tolerates variants like "Clothing", "Clothing & Fashion",
+ * "Fashion & Clothing".
+ */
+function isClothingGroup(node: CategoryNode | null | undefined): boolean {
+  if (!node) return false;
+  const n = node.name.toLowerCase();
+  return n.includes('clothing') || n.includes('fashion');
+}
+
+function applySort<T extends { product: Product }>(items: T[], sortBy: SortKey): T[] {
+  if (sortBy === 'relevance') return items;
+  const copy = [...items];
+  if (sortBy === 'price-asc') copy.sort((a, b) => a.product.price - b.product.price);
+  if (sortBy === 'price-desc') copy.sort((a, b) => b.product.price - a.product.price);
+  return copy;
+}
 
 /* ----------------------------------------------------------------------- */
 /* Page                                                                     */
@@ -77,17 +102,27 @@ export default function CustomerHome() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Pooled products across nearby shops (legacy "All Products" feed)
   const [productsByShop, setProductsByShop] = useState<Map<string, Product[]>>(
     new Map()
   );
   const [productsLoading, setProductsLoading] = useState(false);
+
+  // 8g: Meesho-style multi-filter state for the Clothing & Fashion group.
+  // Lives at page level (not inside the sidebar) so changing groups can
+  // reset it cleanly.
+  const [filters, setFilters] = useState<FiltersState>(EMPTY_FILTERS);
 
   const lat = useDeliveryLocation((s) => s.lat);
   const lng = useDeliveryLocation((s) => s.lng);
   const setLocation = useDeliveryLocation((s) => s.setLocation);
 
   const cart = useCart();
+
+  /* ---------- Identify active group + clothing mode ---------- */
+  const activeGroupNode = activeGroup
+    ? tree.find((g) => g._id === activeGroup) || null
+    : null;
+  const clothingMode = isClothingGroup(activeGroupNode);
 
   /* ---------- First-load silent GPS + reverse-geocode ---------- */
   useEffect(() => {
@@ -135,7 +170,13 @@ export default function CustomerHome() {
       .catch(() => {});
   }, []);
 
-  /* ---------- Shops (re-query on location / filters) ---------- */
+  /* ---------- Shops: query depends on whether sidebar mode is active ----------
+   *
+   * Sidebar mode (clothing) needs multi-select, which the backend doesn't
+   * support on a single param — so for that mode we fetch shops by location
+   * only and filter client-side. Other modes keep the existing single-category
+   * server-side filter (lighter network traffic).
+   */
   useEffect(() => {
     setLoading(true);
     setError(null);
@@ -143,31 +184,54 @@ export default function CustomerHome() {
       lng: lng ?? undefined,
       lat: lat ?? undefined,
       radiusKm: 5,
-      category: activeCategory || undefined,
+      // Skip server-side category filter in clothing/sidebar mode
+      category: clothingMode ? undefined : activeCategory || undefined,
       q: query || undefined,
     })
       .then((r) => setShops(r.shops))
       .catch((e) => setError(e.message || 'Could not load shops'))
       .finally(() => setLoading(false));
-  }, [lat, lng, activeCategory, query]);
+  }, [lat, lng, activeCategory, query, clothingMode]);
 
-  /* ---------- Compute distance for each shop ---------- */
+  /* ---------- Reset filters when group changes ---------- */
+  useEffect(() => {
+    setFilters(EMPTY_FILTERS);
+    setSelectedShopId(null);
+  }, [activeGroup]);
+
+  /* ---------- Distance + sort by nearest ---------- */
   const shopsWithDistance = useMemo(() => {
-    if (lat == null || lng == null) return shops.map((s) => ({ shop: s, km: null }));
-    return shops
-      .map((s) => {
-        const [slng, slat] = s.location.coordinates;
-        return { shop: s, km: haversineKm(lat, lng, slat, slng) };
-      })
-      .sort((a, b) => {
-        if (a.km == null && b.km == null) return 0;
-        if (a.km == null) return 1;
-        if (b.km == null) return -1;
-        return a.km - b.km;
-      });
-  }, [shops, lat, lng]);
+    const withDist = (lat == null || lng == null)
+      ? shops.map((s) => ({ shop: s, km: null as number | null }))
+      : shops.map((s) => {
+          const [slng, slat] = s.location.coordinates;
+          return { shop: s, km: haversineKm(lat, lng, slat, slng) };
+        });
 
-  /* ---------- All Products feed: fetch products for top-N nearest shops ---------- */
+    // In clothing mode, narrow to shops whose category is in this group's children
+    let filtered = withDist;
+    if (clothingMode && activeGroupNode) {
+      const childIds = new Set(activeGroupNode.children.map((c) => c._id));
+      filtered = filtered.filter((x) =>
+        x.shop.category ? childIds.has(x.shop.category) : false
+      );
+      // Further narrow by sidebar's selected subcategories (if any)
+      if (filters.selectedSubcategories.size > 0) {
+        filtered = filtered.filter((x) =>
+          x.shop.category ? filters.selectedSubcategories.has(x.shop.category) : false
+        );
+      }
+    }
+
+    return filtered.sort((a, b) => {
+      if (a.km == null && b.km == null) return 0;
+      if (a.km == null) return 1;
+      if (b.km == null) return -1;
+      return a.km - b.km;
+    });
+  }, [shops, lat, lng, clothingMode, activeGroupNode, filters.selectedSubcategories]);
+
+  /* ---------- All Products feed ---------- */
   useEffect(() => {
     const ids = shopsWithDistance.slice(0, MAX_SHOPS_FOR_PRODUCTS).map((x) => x.shop._id);
     if (ids.length === 0) {
@@ -180,27 +244,44 @@ export default function CustomerHome() {
       .finally(() => setProductsLoading(false));
   }, [shopsWithDistance]);
 
-  /* ---------- Flatten product list, with shop attached, then filter ---------- */
+  /* ---------- Flattened, filtered, sorted product list ---------- */
   const allProducts = useMemo(() => {
-    const list: Array<{ product: Product; shop: Shop }> = [];
+    let list: Array<{ product: Product; shop: Shop }> = [];
     for (const { shop } of shopsWithDistance) {
       const ps = productsByShop.get(shop._id) || [];
       for (const p of ps) list.push({ product: p, shop });
     }
-    let filtered = list;
     if (selectedShopId) {
-      filtered = filtered.filter((x) => x.shop._id === selectedShopId);
+      list = list.filter((x) => x.shop._id === selectedShopId);
     }
     if (query.trim()) {
       const needle = query.toLowerCase();
-      filtered = filtered.filter((x) =>
-        x.product.name.toLowerCase().includes(needle)
-      );
+      list = list.filter((x) => x.product.name.toLowerCase().includes(needle));
     }
-    return filtered;
-  }, [shopsWithDistance, productsByShop, selectedShopId, query]);
+    if (clothingMode) {
+      // Price range
+      if (filters.priceMin) {
+        const min = Number(filters.priceMin);
+        list = list.filter((x) => x.product.price >= min);
+      }
+      if (filters.priceMax) {
+        const max = Number(filters.priceMax);
+        list = list.filter((x) => x.product.price <= max);
+      }
+      list = applySort(list, filters.sortBy);
+    }
+    return list;
+  }, [
+    shopsWithDistance,
+    productsByShop,
+    selectedShopId,
+    query,
+    clothingMode,
+    filters.priceMin,
+    filters.priceMax,
+    filters.sortBy,
+  ]);
 
-  /* ---------- Category-group strip helper ---------- */
   const selectedShop = selectedShopId
     ? shopsWithDistance.find((x) => x.shop._id === selectedShopId)?.shop
     : null;
@@ -221,77 +302,76 @@ export default function CustomerHome() {
         />
       </div>
 
-      {/* Category groups */}
+      {/* Top-level group strip */}
       {tree.length > 0 && (
-        <div className="space-y-2">
-          <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-none">
+        <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-none">
+          <button
+            onClick={() => {
+              setActiveGroup(null);
+              setActiveCategory(null);
+            }}
+            className={`shrink-0 px-3 py-1.5 rounded-full text-sm font-medium border ${
+              activeGroup === null
+                ? 'bg-primary text-primary-foreground border-primary'
+                : 'bg-card border-border hover:bg-muted'
+            }`}
+          >
+            All
+          </button>
+          {tree.map((g) => (
             <button
+              key={g._id}
               onClick={() => {
-                setActiveGroup(null);
+                setActiveGroup(activeGroup === g._id ? null : g._id);
                 setActiveCategory(null);
               }}
               className={`shrink-0 px-3 py-1.5 rounded-full text-sm font-medium border ${
-                activeGroup === null
+                activeGroup === g._id
                   ? 'bg-primary text-primary-foreground border-primary'
                   : 'bg-card border-border hover:bg-muted'
               }`}
             >
-              All
+              {g.icon && <span className="mr-1">{g.icon}</span>}
+              {g.name}
             </button>
-            {tree.map((g) => (
+          ))}
+        </div>
+      )}
+
+      {/* Horizontal subcategory pills — hidden in clothing/sidebar mode */}
+      {activeGroup && !clothingMode &&
+        (() => {
+          const group = tree.find((g) => g._id === activeGroup);
+          if (!group || group.children.length === 0) return null;
+          return (
+            <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-none border-t pt-2">
               <button
-                key={g._id}
-                onClick={() => {
-                  setActiveGroup(activeGroup === g._id ? null : g._id);
-                  setActiveCategory(null);
-                }}
-                className={`shrink-0 px-3 py-1.5 rounded-full text-sm font-medium border ${
-                  activeGroup === g._id
+                onClick={() => setActiveCategory(null)}
+                className={`shrink-0 px-3 py-1 rounded-full text-xs font-medium border ${
+                  activeCategory === null
                     ? 'bg-primary text-primary-foreground border-primary'
                     : 'bg-card border-border hover:bg-muted'
                 }`}
               >
-                {g.icon && <span className="mr-1">{g.icon}</span>}
-                {g.name}
+                All {group.name}
               </button>
-            ))}
-          </div>
-
-          {activeGroup &&
-            (() => {
-              const group = tree.find((g) => g._id === activeGroup);
-              if (!group || group.children.length === 0) return null;
-              return (
-                <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-none border-t pt-2">
-                  <button
-                    onClick={() => setActiveCategory(null)}
-                    className={`shrink-0 px-3 py-1 rounded-full text-xs font-medium border ${
-                      activeCategory === null
-                        ? 'bg-primary text-primary-foreground border-primary'
-                        : 'bg-card border-border hover:bg-muted'
-                    }`}
-                  >
-                    All {group.name}
-                  </button>
-                  {group.children.map((c) => (
-                    <button
-                      key={c._id}
-                      onClick={() => setActiveCategory(c._id)}
-                      className={`shrink-0 px-3 py-1 rounded-full text-xs font-medium border ${
-                        activeCategory === c._id
-                          ? 'bg-primary text-primary-foreground border-primary'
-                          : 'bg-card border-border hover:bg-muted'
-                      }`}
-                    >
-                      {c.icon && <span className="mr-1">{c.icon}</span>}
-                      {c.name}
-                    </button>
-                  ))}
-                </div>
-              );
-            })()}
-        </div>
-      )}
+              {group.children.map((c) => (
+                <button
+                  key={c._id}
+                  onClick={() => setActiveCategory(c._id)}
+                  className={`shrink-0 px-3 py-1 rounded-full text-xs font-medium border ${
+                    activeCategory === c._id
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'bg-card border-border hover:bg-muted'
+                  }`}
+                >
+                  {c.icon && <span className="mr-1">{c.icon}</span>}
+                  {c.name}
+                </button>
+              ))}
+            </div>
+          );
+        })()}
 
       {error && (
         <div className="text-sm text-destructive bg-destructive/10 rounded-md px-3 py-2">
@@ -299,226 +379,330 @@ export default function CustomerHome() {
         </div>
       )}
 
-      {/* ------------------------------------------------------------------ */}
-      {/* Shops near you — HORIZONTAL SCROLL STRIP                            */}
-      {/* ------------------------------------------------------------------ */}
-      <section className="space-y-2">
-        <div className="flex items-center justify-between px-1">
-          <h2 className="text-base font-bold tracking-tight">Shops near you</h2>
-        </div>
+      {/* ============================================================ */}
+      {/* CLOTHING & FASHION MODE — sidebar layout                      */}
+      {/* ============================================================ */}
+      {clothingMode && activeGroupNode ? (
+        <div className="flex gap-5">
+          <ClothingFiltersSidebar
+            subcategories={activeGroupNode.children}
+            filters={filters}
+            onChange={setFilters}
+            productCount={allProducts.length}
+          />
 
-        {loading ? (
-          <div className="flex gap-2.5 overflow-x-auto pb-2">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <div
-                key={i}
-                className="shrink-0 w-28 h-32 rounded-xl bg-muted animate-pulse"
+          {/* Right-side main column */}
+          <div className="flex-1 min-w-0 space-y-5">
+            {/* Mobile filters button + title */}
+            <div className="flex items-center justify-between gap-3 lg:hidden">
+              <h2 className="text-base font-bold tracking-tight">
+                {activeGroupNode.name}
+              </h2>
+              <ClothingFiltersMobile
+                subcategories={activeGroupNode.children}
+                filters={filters}
+                onChange={setFilters}
+                productCount={allProducts.length}
               />
-            ))}
+            </div>
+
+            {/* Shops strip */}
+            <ShopsStrip
+              loading={loading}
+              shopsWithDistance={shopsWithDistance}
+              selectedShopId={selectedShopId}
+              setSelectedShopId={setSelectedShopId}
+            />
+
+            {/* Products grid */}
+            <ProductsGrid
+              productsLoading={productsLoading}
+              allProducts={allProducts}
+              selectedShop={selectedShop}
+              setSelectedShopId={setSelectedShopId}
+              query={query}
+              cart={cart}
+              showShopBadge
+            />
           </div>
-        ) : shopsWithDistance.length === 0 ? (
-          <div className="text-sm text-muted-foreground px-1 py-4">
-            No shops open here right now.
-          </div>
-        ) : (
-          <div className="flex gap-2.5 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-none">
-            {shopsWithDistance.map(({ shop, km }) => {
-              const isActive = selectedShopId === shop._id;
-              return (
-                <button
-                  key={shop._id}
-                  onClick={() =>
-                    setSelectedShopId(isActive ? null : shop._id)
-                  }
-                  className={`shrink-0 w-28 rounded-xl border p-2 text-center transition ${
-                    isActive
-                      ? 'border-primary bg-[#f0fbf2] shadow-[0_2px_8px_rgba(12,131,31,0.12)]'
-                      : 'border-border bg-card hover:border-primary/50'
-                  }`}
+        </div>
+      ) : (
+        /* ============================================================ */
+        /* DEFAULT (non-clothing) layout                                 */
+        /* ============================================================ */
+        <>
+          <ShopsStrip
+            loading={loading}
+            shopsWithDistance={shopsWithDistance}
+            selectedShopId={selectedShopId}
+            setSelectedShopId={setSelectedShopId}
+          />
+          <ProductsGrid
+            productsLoading={productsLoading}
+            allProducts={allProducts}
+            selectedShop={selectedShop}
+            setSelectedShopId={setSelectedShopId}
+            query={query}
+            cart={cart}
+            showShopBadge={false}
+          />
+        </>
+      )}
+    </main>
+  );
+}
+
+/* ----------------------------------------------------------------------- */
+/* Subcomponents — same JSX as before, factored out so both layouts use it. */
+/* ----------------------------------------------------------------------- */
+
+interface ShopsStripProps {
+  loading: boolean;
+  shopsWithDistance: Array<{ shop: Shop; km: number | null }>;
+  selectedShopId: string | null;
+  setSelectedShopId: (id: string | null) => void;
+}
+
+function ShopsStrip({
+  loading,
+  shopsWithDistance,
+  selectedShopId,
+  setSelectedShopId,
+}: ShopsStripProps) {
+  return (
+    <section className="space-y-2">
+      <div className="flex items-center justify-between px-1">
+        <h2 className="text-base font-bold tracking-tight">Shops near you</h2>
+      </div>
+
+      {loading ? (
+        <div className="flex gap-2.5 overflow-x-auto pb-2">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div
+              key={i}
+              className="shrink-0 w-28 h-32 rounded-xl bg-muted animate-pulse"
+            />
+          ))}
+        </div>
+      ) : shopsWithDistance.length === 0 ? (
+        <div className="text-sm text-muted-foreground px-1 py-4">
+          No shops open here right now.
+        </div>
+      ) : (
+        <div className="flex gap-2.5 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-none">
+          {shopsWithDistance.map(({ shop, km }) => {
+            const isActive = selectedShopId === shop._id;
+            return (
+              <button
+                key={shop._id}
+                onClick={() => setSelectedShopId(isActive ? null : shop._id)}
+                className={`shrink-0 w-28 rounded-xl border p-2 text-center transition ${
+                  isActive
+                    ? 'border-primary bg-[#f0fbf2] shadow-[0_2px_8px_rgba(12,131,31,0.12)]'
+                    : 'border-border bg-card hover:border-primary/50'
+                }`}
+              >
+                <div className="w-12 h-12 mx-auto rounded-full bg-[#fff5d6] overflow-hidden flex items-center justify-center mb-1.5">
+                  {shop.logo ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={shop.logo}
+                      alt=""
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <ShoppingCart className="h-5 w-5 text-[#8a6500]" />
+                  )}
+                </div>
+                <div className="text-[12px] font-semibold leading-tight line-clamp-2 min-h-[2.2rem]">
+                  {shop.name}
+                </div>
+                <div className="text-[10px] text-muted-foreground truncate mt-0.5">
+                  {shop.description || 'Local Shop'}
+                </div>
+                {km != null && (
+                  <div className="inline-block mt-1.5 text-[9px] font-extrabold tracking-wide text-[#1857c1] bg-[#dbe9ff] px-1.5 py-0.5 rounded">
+                    📏 {km.toFixed(1)} km
+                  </div>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
+interface ProductsGridProps {
+  productsLoading: boolean;
+  allProducts: Array<{ product: Product; shop: Shop }>;
+  selectedShop: Shop | null | undefined;
+  setSelectedShopId: (id: string | null) => void;
+  query: string;
+  cart: ReturnType<typeof useCart>;
+  showShopBadge: boolean;
+}
+
+function ProductsGrid({
+  productsLoading,
+  allProducts,
+  selectedShop,
+  setSelectedShopId,
+  query,
+  cart,
+  showShopBadge,
+}: ProductsGridProps) {
+  return (
+    <section className="space-y-3">
+      <div className="flex items-center justify-between px-1">
+        <h2 className="text-base font-bold tracking-tight">
+          {query.trim()
+            ? `Results for "${query}"`
+            : selectedShop
+              ? selectedShop.name
+              : 'All Products'}
+        </h2>
+        {selectedShop && (
+          <button
+            onClick={() => setSelectedShopId(null)}
+            className="text-xs text-primary font-bold"
+          >
+            Clear filter
+          </button>
+        )}
+      </div>
+
+      {productsLoading ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div
+              key={i}
+              className="aspect-[3/4] rounded-xl bg-muted animate-pulse"
+            />
+          ))}
+        </div>
+      ) : allProducts.length === 0 ? (
+        <div className="text-center py-12 text-sm text-muted-foreground">
+          🛒 No products found.
+          <br />
+          Try a different category or search.
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+          {allProducts.map(({ product: p, shop }) => {
+            const inCart = cart.items.find((i) => i.productId === p._id);
+            const isOut = !p.inStock || p.stock === 0;
+            const discountPct =
+              p.mrp && p.mrp > p.price
+                ? Math.round(((p.mrp - p.price) / p.mrp) * 100)
+                : 0;
+
+            return (
+              <Card key={p._id} className="overflow-hidden flex flex-col">
+                <Link
+                  href={`/customer/shop/${shop._id}`}
+                  className="relative aspect-square bg-muted block"
                 >
-                  {/* Shop "logo" — uses uploaded logo if present, else cart fallback */}
-                  <div className="w-12 h-12 mx-auto rounded-full bg-[#fff5d6] overflow-hidden flex items-center justify-center mb-1.5">
-                    {shop.logo ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={shop.logo}
-                        alt=""
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <ShoppingCart className="h-5 w-5 text-[#8a6500]" />
-                    )}
-                  </div>
-                  <div className="text-[12px] font-semibold leading-tight line-clamp-2 min-h-[2.2rem]">
-                    {shop.name}
-                  </div>
-                  <div className="text-[10px] text-muted-foreground truncate mt-0.5">
-                    {shop.description || 'Local Shop'}
-                  </div>
-                  {km != null && (
-                    <div className="inline-block mt-1.5 text-[9px] font-extrabold tracking-wide text-[#1857c1] bg-[#dbe9ff] px-1.5 py-0.5 rounded">
-                      📏 {km.toFixed(1)} km
+                  {discountPct > 0 && (
+                    <div className="absolute top-0 left-2 z-10 bg-primary text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-b">
+                      {discountPct}% OFF
                     </div>
                   )}
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </section>
-
-      {/* ------------------------------------------------------------------ */}
-      {/* All Products — Blinkit-style square card grid                       */}
-      {/* ------------------------------------------------------------------ */}
-      <section className="space-y-3">
-        <div className="flex items-center justify-between px-1">
-          <h2 className="text-base font-bold tracking-tight">
-            {query.trim()
-              ? `Results for "${query}"`
-              : selectedShop
-                ? selectedShop.name
-                : 'All Products'}
-          </h2>
-          {selectedShop && (
-            <button
-              onClick={() => setSelectedShopId(null)}
-              className="text-xs text-primary font-bold"
-            >
-              Clear filter
-            </button>
-          )}
-        </div>
-
-        {productsLoading ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="aspect-[3/4] rounded-xl bg-muted animate-pulse" />
-            ))}
-          </div>
-        ) : allProducts.length === 0 ? (
-          <div className="text-center py-12 text-sm text-muted-foreground">
-            🛒 No products found.
-            <br />
-            Try a different category or search.
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-            {allProducts.map(({ product: p, shop }) => {
-              const inCart = cart.items.find((i) => i.productId === p._id);
-              const isOut = !p.inStock || p.stock === 0;
-              const discountPct =
-                p.mrp && p.mrp > p.price
-                  ? Math.round(((p.mrp - p.price) / p.mrp) * 100)
-                  : 0;
-
-              return (
-                <Card key={p._id} className="overflow-hidden flex flex-col">
-                  <Link
-                    href={`/customer/shop/${shop._id}`}
-                    className="relative aspect-square bg-muted block"
-                  >
-                    {discountPct > 0 && (
-                      <div className="absolute top-0 left-2 z-10 bg-primary text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-b">
-                        {discountPct}% OFF
-                      </div>
-                    )}
-                    {p.image ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={p.image}
-                        alt={p.name}
-                        loading="lazy"
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <ImageIcon className="h-8 w-8 text-muted-foreground/40" />
-                      </div>
-                    )}
-                  </Link>
-
-                  <div className="p-2 flex-1 flex flex-col gap-1">
-                    <div className="inline-flex items-center gap-1 text-[10px] font-semibold text-muted-foreground bg-muted px-1.5 py-0.5 rounded w-fit">
-                      <Zap className="h-2.5 w-2.5 fill-current" /> 15 MINS
+                  {p.image ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={p.image}
+                      alt={p.name}
+                      loading="lazy"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <ImageIcon className="h-8 w-8 text-muted-foreground/40" />
                     </div>
+                  )}
+                </Link>
 
-                    <div className="text-sm font-medium leading-tight line-clamp-2 min-h-[2.5rem]">
-                      {p.name}
-                    </div>
-
-                    <div className="text-[11px] text-muted-foreground truncate">
-                      {p.weight || '1 unit'}
-                      {!selectedShop && (
-                        <>
-                          {' · '}
-                          <span className="text-muted-foreground/80">
-                            {shop.name}
-                          </span>
-                        </>
-                      )}
-                    </div>
-
-                    <div className="flex items-center justify-between gap-2 mt-auto pt-1">
-                      <div className="flex flex-col leading-tight">
-                        <span className="font-semibold text-sm">₹{p.price}</span>
-                        {p.mrp && p.mrp > p.price && (
-                          <span className="text-[10px] text-muted-foreground line-through">
-                            ₹{p.mrp}
-                          </span>
-                        )}
-                      </div>
-
-                      {isOut ? (
-                        <span className="text-[10px] text-muted-foreground font-medium">
-                          Out
-                        </span>
-                      ) : inCart ? (
-                        <div className="flex items-center bg-primary text-primary-foreground rounded overflow-hidden">
-                          <button
-                            aria-label="Decrease quantity"
-                            className="w-7 h-7 flex items-center justify-center hover:bg-primary/85 transition"
-                            onClick={() => cart.setQty(p._id, inCart.qty - 1)}
-                          >
-                            <Minus className="h-3 w-3" />
-                          </button>
-                          <span className="text-xs font-bold w-5 text-center">
-                            {inCart.qty}
-                          </span>
-                          <button
-                            aria-label="Increase quantity"
-                            className="w-7 h-7 flex items-center justify-center hover:bg-primary/85 transition"
-                            onClick={() => cart.setQty(p._id, inCart.qty + 1)}
-                          >
-                            <Plus className="h-3 w-3" />
-                          </button>
-                        </div>
-                      ) : (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-7 px-3 text-xs font-bold tracking-wider border-primary text-primary hover:bg-primary/10 hover:text-primary"
-                          onClick={() =>
-                            cart.add({
-                              productId: p._id,
-                              shopId: shop._id,
-                              name: p.name,
-                              price: p.price,
-                              weight: p.weight,
-                              image: p.image,
-                            })
-                          }
-                        >
-                          ADD
-                        </Button>
-                      )}
-                    </div>
+                <div className="p-2 flex-1 flex flex-col gap-1">
+                  <div className="inline-flex items-center gap-1 text-[10px] font-semibold text-muted-foreground bg-muted px-1.5 py-0.5 rounded w-fit">
+                    <Zap className="h-2.5 w-2.5 fill-current" /> 15 MINS
                   </div>
-                </Card>
-              );
-            })}
-          </div>
-        )}
-      </section>
-    </main>
+
+                  <div className="text-sm font-medium leading-tight line-clamp-2 min-h-[2.5rem]">
+                    {p.name}
+                  </div>
+
+                  <div className="text-[11px] text-muted-foreground truncate">
+                    {p.weight || '1 unit'}
+                    {(showShopBadge || !selectedShop) && (
+                      <>
+                        {' · '}
+                        <span className="text-muted-foreground/80">{shop.name}</span>
+                      </>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between gap-2 mt-auto pt-1">
+                    <div className="flex flex-col leading-tight">
+                      <span className="font-semibold text-sm">₹{p.price}</span>
+                      {p.mrp && p.mrp > p.price && (
+                        <span className="text-[10px] text-muted-foreground line-through">
+                          ₹{p.mrp}
+                        </span>
+                      )}
+                    </div>
+
+                    {isOut ? (
+                      <span className="text-[10px] text-muted-foreground font-medium">
+                        Out
+                      </span>
+                    ) : inCart ? (
+                      <div className="flex items-center bg-primary text-primary-foreground rounded overflow-hidden">
+                        <button
+                          aria-label="Decrease quantity"
+                          className="w-7 h-7 flex items-center justify-center hover:bg-primary/85 transition"
+                          onClick={() => cart.setQty(p._id, inCart.qty - 1)}
+                        >
+                          <Minus className="h-3 w-3" />
+                        </button>
+                        <span className="text-xs font-bold w-5 text-center">
+                          {inCart.qty}
+                        </span>
+                        <button
+                          aria-label="Increase quantity"
+                          className="w-7 h-7 flex items-center justify-center hover:bg-primary/85 transition"
+                          onClick={() => cart.setQty(p._id, inCart.qty + 1)}
+                        >
+                          <Plus className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 px-3 text-xs font-bold tracking-wider border-primary text-primary hover:bg-primary/10 hover:text-primary"
+                        onClick={() =>
+                          cart.add({
+                            productId: p._id,
+                            shopId: shop._id,
+                            name: p.name,
+                            price: p.price,
+                            weight: p.weight,
+                            image: p.image,
+                          })
+                        }
+                      >
+                        ADD
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+    </section>
   );
 }
