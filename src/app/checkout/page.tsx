@@ -1,9 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Loader2, MapPin, Truck } from 'lucide-react';
+import { ArrowLeft, Loader2, Truck } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,11 +14,31 @@ import { Header } from '@/components/layout/header';
 
 import { useCart } from '@/stores/cart';
 import { useAuth } from '@/stores/auth';
+import { useDeliveryLocation } from '@/stores/deliveryLocation';
 import { getCurrentPosition } from '@/lib/geo';
 import { fetchQuote, checkout, verifyPayment } from '@/lib/orders';
 import { openRazorpayCheckout } from '@/lib/razorpay';
 import { ApiError } from '@/lib/api';
 import { getCartWeightKg, getRecommendedVehicle, VEHICLE_DISPLAY } from '@/lib/weight';
+
+/**
+ * Leaflet touches `window` at import time — dynamic-import with ssr:false.
+ * Same pattern as shop/LocationPicker and the front-page modal.
+ */
+const CheckoutLocationPicker = dynamic(
+  () =>
+    import('@/components/customer/CheckoutLocationPicker').then((m) => ({
+      default: m.CheckoutLocationPicker,
+    })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-72 rounded-lg border bg-muted flex items-center justify-center text-sm text-muted-foreground">
+        Loading map…
+      </div>
+    ),
+  }
+);
 
 type Quote = Awaited<ReturnType<typeof fetchQuote>>;
 
@@ -49,11 +70,32 @@ export default function CheckoutPage() {
     }
   }, [user]);
 
-  // Try to get drop location
+  // 8f: Location bootstrap.
+  //
+  // Priority:
+  //   1. Front-page delivery store (For Me / For Someone Else picker)
+  //      — most accurate, customer already confirmed it.
+  //   2. Fall back to silent browser GPS if the store is empty
+  //      — for users who landed straight on /checkout without using the picker.
+  //
+  // We also pre-fill the recipient's "Flat / building, area" field with the
+  // reverse-geocoded address from the store, so customer can just append a
+  // flat number rather than typing the whole line.
+  const dl = useDeliveryLocation();
   useEffect(() => {
+    if (dl.lat != null && dl.lng != null) {
+      setCoords({ lat: dl.lat, lng: dl.lng });
+      // Only prefill address if customer hasn't typed anything yet
+      if (dl.address) {
+        setRecipient((r) => ({ ...r, address: r.address || dl.address }));
+      }
+      return;
+    }
     getCurrentPosition().then((c) => {
       if (c) setCoords({ lng: c.longitude, lat: c.latitude });
     });
+    // Run once on mount — we don't want to clobber user edits if dl changes later.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // 7a: Compute total cart weight and auto-recommend a vehicle.
@@ -249,11 +291,35 @@ export default function CheckoutPage() {
                 placeholder="Flat / building, area"
               />
             </div>
-            <div className="text-xs text-muted-foreground flex items-center gap-1">
-              <MapPin className="h-3 w-3" />
-              {coords
-                ? `Drop pin: ${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)}`
-                : 'Waiting for location...'}
+
+            {/* Embedded map picker — pre-populated from front-page delivery store */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <Label>Delivery location</Label>
+                {dl.mode === 'other' && (
+                  <span className="text-[10px] font-bold text-primary bg-[#dcf3e1] px-2 py-0.5 rounded-full">
+                    🎁 Gift order
+                  </span>
+                )}
+              </div>
+              <CheckoutLocationPicker
+                lat={coords?.lat ?? null}
+                lng={coords?.lng ?? null}
+                giftMode={dl.mode === 'other'}
+                onChange={({ lat, lng, address }) => {
+                  setCoords({ lat, lng });
+                  // Only overwrite address if it's still empty (or matches what
+                  // we previously auto-filled). Don't clobber a manual edit.
+                  if (address && !recipient.address) {
+                    setRecipient((r) => ({ ...r, address }));
+                  }
+                }}
+              />
+              <p className="text-[11px] text-muted-foreground leading-snug">
+                {dl.mode === 'other'
+                  ? 'Drag the pin to the recipient\u2019s exact gate or building entrance.'
+                  : 'Drag the pin if it isn\u2019t exactly where you want delivery.'}
+              </p>
             </div>
           </CardContent>
         </Card>
