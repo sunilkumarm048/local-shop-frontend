@@ -1,37 +1,95 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Search, Star } from 'lucide-react';
+import { Minus, Plus, Search, ShoppingCart, Zap, ImageIcon } from 'lucide-react';
 
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent } from '@/components/ui/card';
 import { getCurrentPosition } from '@/lib/geo';
-import { fetchNearbyShops, fetchCategoryTree, type Shop, type CategoryNode } from '@/lib/shops';
+import {
+  fetchNearbyShops,
+  fetchShopProducts,
+  fetchCategoryTree,
+  type Shop,
+  type Product,
+  type CategoryNode,
+} from '@/lib/shops';
 import { DeliveryLocationBar } from '@/components/customer/DeliveryLocationBar';
 import { useDeliveryLocation } from '@/stores/deliveryLocation';
+import { useCart } from '@/stores/cart';
+
+/* ----------------------------------------------------------------------- */
+/* Helpers                                                                  */
+/* ----------------------------------------------------------------------- */
+
+/** Great-circle distance in km between two lat/lng points. */
+function haversineKm(
+  lat1: number,
+  lng1: number,
+  lat2: number,
+  lng2: number
+): number {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+/** Fetch products for many shops in parallel, return [{ shop, products[] }]. */
+async function fetchProductsForShops(
+  shopIds: string[]
+): Promise<Map<string, Product[]>> {
+  const map = new Map<string, Product[]>();
+  await Promise.all(
+    shopIds.map(async (id) => {
+      try {
+        const r = await fetchShopProducts(id);
+        map.set(id, r.products);
+      } catch {
+        map.set(id, []);
+      }
+    })
+  );
+  return map;
+}
+
+/** Cap how many shops we hit for the All Products feed (keeps it snappy). */
+const MAX_SHOPS_FOR_PRODUCTS = 6;
+
+/* ----------------------------------------------------------------------- */
+/* Page                                                                     */
+/* ----------------------------------------------------------------------- */
 
 export default function CustomerHome() {
   const [shops, setShops] = useState<Shop[]>([]);
   const [tree, setTree] = useState<CategoryNode[]>([]);
   const [activeGroup, setActiveGroup] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [selectedShopId, setSelectedShopId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Pooled products across nearby shops (legacy "All Products" feed)
+  const [productsByShop, setProductsByShop] = useState<Map<string, Product[]>>(
+    new Map()
+  );
+  const [productsLoading, setProductsLoading] = useState(false);
 
   const lat = useDeliveryLocation((s) => s.lat);
   const lng = useDeliveryLocation((s) => s.lng);
   const setLocation = useDeliveryLocation((s) => s.setLocation);
 
-  /**
-   * On first mount, if the user hasn't set a delivery location yet, try a
-   * silent GPS detection and save it as "self" mode. Matches the legacy
-   * site's behavior of auto-filling without opening the modal.
-   *
-   * Reverse-geocode is fire-and-forget so the area name fills in shortly
-   * after; shop loading doesn't wait for it.
-   */
+  const cart = useCart();
+
+  /* ---------- First-load silent GPS + reverse-geocode ---------- */
   useEffect(() => {
     if (lat != null && lng != null) return;
     getCurrentPosition().then(async (c) => {
@@ -70,14 +128,14 @@ export default function CustomerHome() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Load category tree once
+  /* ---------- Category tree (once) ---------- */
   useEffect(() => {
     fetchCategoryTree()
       .then((r) => setTree(r.categories))
       .catch(() => {});
   }, []);
 
-  // Load shops whenever filters or delivery location change
+  /* ---------- Shops (re-query on location / filters) ---------- */
   useEffect(() => {
     setLoading(true);
     setError(null);
@@ -93,23 +151,77 @@ export default function CustomerHome() {
       .finally(() => setLoading(false));
   }, [lat, lng, activeCategory, query]);
 
+  /* ---------- Compute distance for each shop ---------- */
+  const shopsWithDistance = useMemo(() => {
+    if (lat == null || lng == null) return shops.map((s) => ({ shop: s, km: null }));
+    return shops
+      .map((s) => {
+        const [slng, slat] = s.location.coordinates;
+        return { shop: s, km: haversineKm(lat, lng, slat, slng) };
+      })
+      .sort((a, b) => {
+        if (a.km == null && b.km == null) return 0;
+        if (a.km == null) return 1;
+        if (b.km == null) return -1;
+        return a.km - b.km;
+      });
+  }, [shops, lat, lng]);
+
+  /* ---------- All Products feed: fetch products for top-N nearest shops ---------- */
+  useEffect(() => {
+    const ids = shopsWithDistance.slice(0, MAX_SHOPS_FOR_PRODUCTS).map((x) => x.shop._id);
+    if (ids.length === 0) {
+      setProductsByShop(new Map());
+      return;
+    }
+    setProductsLoading(true);
+    fetchProductsForShops(ids)
+      .then(setProductsByShop)
+      .finally(() => setProductsLoading(false));
+  }, [shopsWithDistance]);
+
+  /* ---------- Flatten product list, with shop attached, then filter ---------- */
+  const allProducts = useMemo(() => {
+    const list: Array<{ product: Product; shop: Shop }> = [];
+    for (const { shop } of shopsWithDistance) {
+      const ps = productsByShop.get(shop._id) || [];
+      for (const p of ps) list.push({ product: p, shop });
+    }
+    let filtered = list;
+    if (selectedShopId) {
+      filtered = filtered.filter((x) => x.shop._id === selectedShopId);
+    }
+    if (query.trim()) {
+      const needle = query.toLowerCase();
+      filtered = filtered.filter((x) =>
+        x.product.name.toLowerCase().includes(needle)
+      );
+    }
+    return filtered;
+  }, [shopsWithDistance, productsByShop, selectedShopId, query]);
+
+  /* ---------- Category-group strip helper ---------- */
+  const selectedShop = selectedShopId
+    ? shopsWithDistance.find((x) => x.shop._id === selectedShopId)?.shop
+    : null;
+
+  /* ---------- Render ---------- */
   return (
     <main className="container py-5 space-y-5">
-      {/* Delivery location bar — chip + (optional) gift banner */}
       <DeliveryLocationBar />
 
       {/* Search */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search shops, products..."
+          placeholder="Search for atta, milk, snacks..."
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           className="pl-9"
         />
       </div>
 
-      {/* Category groups — top-level strip */}
+      {/* Category groups */}
       {tree.length > 0 && (
         <div className="space-y-2">
           <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-none">
@@ -145,7 +257,6 @@ export default function CustomerHome() {
             ))}
           </div>
 
-          {/* Subcategory strip — appears only when a group is selected */}
           {activeGroup &&
             (() => {
               const group = tree.find((g) => g._id === activeGroup);
@@ -156,7 +267,7 @@ export default function CustomerHome() {
                     onClick={() => setActiveCategory(null)}
                     className={`shrink-0 px-3 py-1 rounded-full text-xs font-medium border ${
                       activeCategory === null
-                        ? 'bg-brand-green text-white border-brand-green'
+                        ? 'bg-primary text-primary-foreground border-primary'
                         : 'bg-card border-border hover:bg-muted'
                     }`}
                   >
@@ -168,7 +279,7 @@ export default function CustomerHome() {
                       onClick={() => setActiveCategory(c._id)}
                       className={`shrink-0 px-3 py-1 rounded-full text-xs font-medium border ${
                         activeCategory === c._id
-                          ? 'bg-brand-green text-white border-brand-green'
+                          ? 'bg-primary text-primary-foreground border-primary'
                           : 'bg-card border-border hover:bg-muted'
                       }`}
                     >
@@ -182,68 +293,232 @@ export default function CustomerHome() {
         </div>
       )}
 
-      {/* Shop grid */}
       {error && (
         <div className="text-sm text-destructive bg-destructive/10 rounded-md px-3 py-2">
           {error}
         </div>
       )}
 
-      {loading ? (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="h-32 rounded-xl bg-muted animate-pulse" />
-          ))}
+      {/* ------------------------------------------------------------------ */}
+      {/* Shops near you — HORIZONTAL SCROLL STRIP                            */}
+      {/* ------------------------------------------------------------------ */}
+      <section className="space-y-2">
+        <div className="flex items-center justify-between px-1">
+          <h2 className="text-base font-bold tracking-tight">Shops near you</h2>
         </div>
-      ) : shops.length === 0 ? (
-        <div className="text-center py-16 text-muted-foreground">
-          No shops found nearby. Try widening your search.
-        </div>
-      ) : (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {shops.map((shop) => (
-            <Link key={shop._id} href={`/customer/shop/${shop._id}`}>
-              <Card className="hover:shadow-md transition-shadow cursor-pointer h-full">
-                <CardContent className="p-4 space-y-2">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="font-semibold">{shop.name}</div>
-                      {shop.description && (
-                        <div className="text-xs text-muted-foreground line-clamp-1 mt-0.5">
-                          {shop.description}
-                        </div>
-                      )}
+
+        {loading ? (
+          <div className="flex gap-2.5 overflow-x-auto pb-2">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div
+                key={i}
+                className="shrink-0 w-28 h-32 rounded-xl bg-muted animate-pulse"
+              />
+            ))}
+          </div>
+        ) : shopsWithDistance.length === 0 ? (
+          <div className="text-sm text-muted-foreground px-1 py-4">
+            No shops open here right now.
+          </div>
+        ) : (
+          <div className="flex gap-2.5 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-none">
+            {shopsWithDistance.map(({ shop, km }) => {
+              const isActive = selectedShopId === shop._id;
+              return (
+                <button
+                  key={shop._id}
+                  onClick={() =>
+                    setSelectedShopId(isActive ? null : shop._id)
+                  }
+                  className={`shrink-0 w-28 rounded-xl border p-2 text-center transition ${
+                    isActive
+                      ? 'border-primary bg-[#f0fbf2] shadow-[0_2px_8px_rgba(12,131,31,0.12)]'
+                      : 'border-border bg-card hover:border-primary/50'
+                  }`}
+                >
+                  {/* Shop "logo" — uses uploaded logo if present, else cart fallback */}
+                  <div className="w-12 h-12 mx-auto rounded-full bg-[#fff5d6] overflow-hidden flex items-center justify-center mb-1.5">
+                    {shop.logo ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={shop.logo}
+                        alt=""
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <ShoppingCart className="h-5 w-5 text-[#8a6500]" />
+                    )}
+                  </div>
+                  <div className="text-[12px] font-semibold leading-tight line-clamp-2 min-h-[2.2rem]">
+                    {shop.name}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground truncate mt-0.5">
+                    {shop.description || 'Local Shop'}
+                  </div>
+                  {km != null && (
+                    <div className="inline-block mt-1.5 text-[9px] font-extrabold tracking-wide text-[#1857c1] bg-[#dbe9ff] px-1.5 py-0.5 rounded">
+                      📏 {km.toFixed(1)} km
                     </div>
-                    {shop.rating > 0 && (
-                      <div className="flex items-center gap-1 text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">
-                        <Star className="h-3 w-3 fill-current" />
-                        {shop.rating.toFixed(1)}
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* All Products — Blinkit-style square card grid                       */}
+      {/* ------------------------------------------------------------------ */}
+      <section className="space-y-3">
+        <div className="flex items-center justify-between px-1">
+          <h2 className="text-base font-bold tracking-tight">
+            {query.trim()
+              ? `Results for "${query}"`
+              : selectedShop
+                ? selectedShop.name
+                : 'All Products'}
+          </h2>
+          {selectedShop && (
+            <button
+              onClick={() => setSelectedShopId(null)}
+              className="text-xs text-primary font-bold"
+            >
+              Clear filter
+            </button>
+          )}
+        </div>
+
+        {productsLoading ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="aspect-[3/4] rounded-xl bg-muted animate-pulse" />
+            ))}
+          </div>
+        ) : allProducts.length === 0 ? (
+          <div className="text-center py-12 text-sm text-muted-foreground">
+            🛒 No products found.
+            <br />
+            Try a different category or search.
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+            {allProducts.map(({ product: p, shop }) => {
+              const inCart = cart.items.find((i) => i.productId === p._id);
+              const isOut = !p.inStock || p.stock === 0;
+              const discountPct =
+                p.mrp && p.mrp > p.price
+                  ? Math.round(((p.mrp - p.price) / p.mrp) * 100)
+                  : 0;
+
+              return (
+                <Card key={p._id} className="overflow-hidden flex flex-col">
+                  <Link
+                    href={`/customer/shop/${shop._id}`}
+                    className="relative aspect-square bg-muted block"
+                  >
+                    {discountPct > 0 && (
+                      <div className="absolute top-0 left-2 z-10 bg-primary text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-b">
+                        {discountPct}% OFF
                       </div>
                     )}
-                  </div>
-                  <div className="flex items-center justify-between text-xs">
-                    {shop.address?.city && (
-                      <span className="text-muted-foreground">
-                        {shop.address.city}
-                        {shop.address.pincode && ` · ${shop.address.pincode}`}
-                      </span>
+                    {p.image ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={p.image}
+                        alt={p.name}
+                        loading="lazy"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <ImageIcon className="h-8 w-8 text-muted-foreground/40" />
+                      </div>
                     )}
-                    <span
-                      className={
-                        shop.isOpen
-                          ? 'text-primary font-medium'
-                          : 'text-muted-foreground'
-                      }
-                    >
-                      {shop.isOpen ? 'Open' : 'Closed'}
-                    </span>
+                  </Link>
+
+                  <div className="p-2 flex-1 flex flex-col gap-1">
+                    <div className="inline-flex items-center gap-1 text-[10px] font-semibold text-muted-foreground bg-muted px-1.5 py-0.5 rounded w-fit">
+                      <Zap className="h-2.5 w-2.5 fill-current" /> 15 MINS
+                    </div>
+
+                    <div className="text-sm font-medium leading-tight line-clamp-2 min-h-[2.5rem]">
+                      {p.name}
+                    </div>
+
+                    <div className="text-[11px] text-muted-foreground truncate">
+                      {p.weight || '1 unit'}
+                      {!selectedShop && (
+                        <>
+                          {' · '}
+                          <span className="text-muted-foreground/80">
+                            {shop.name}
+                          </span>
+                        </>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2 mt-auto pt-1">
+                      <div className="flex flex-col leading-tight">
+                        <span className="font-semibold text-sm">₹{p.price}</span>
+                        {p.mrp && p.mrp > p.price && (
+                          <span className="text-[10px] text-muted-foreground line-through">
+                            ₹{p.mrp}
+                          </span>
+                        )}
+                      </div>
+
+                      {isOut ? (
+                        <span className="text-[10px] text-muted-foreground font-medium">
+                          Out
+                        </span>
+                      ) : inCart ? (
+                        <div className="flex items-center bg-primary text-primary-foreground rounded overflow-hidden">
+                          <button
+                            aria-label="Decrease quantity"
+                            className="w-7 h-7 flex items-center justify-center hover:bg-primary/85 transition"
+                            onClick={() => cart.setQty(p._id, inCart.qty - 1)}
+                          >
+                            <Minus className="h-3 w-3" />
+                          </button>
+                          <span className="text-xs font-bold w-5 text-center">
+                            {inCart.qty}
+                          </span>
+                          <button
+                            aria-label="Increase quantity"
+                            className="w-7 h-7 flex items-center justify-center hover:bg-primary/85 transition"
+                            onClick={() => cart.setQty(p._id, inCart.qty + 1)}
+                          >
+                            <Plus className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 px-3 text-xs font-bold tracking-wider border-primary text-primary hover:bg-primary/10 hover:text-primary"
+                          onClick={() =>
+                            cart.add({
+                              productId: p._id,
+                              shopId: shop._id,
+                              name: p.name,
+                              price: p.price,
+                              weight: p.weight,
+                              image: p.image,
+                            })
+                          }
+                        >
+                          ADD
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
-        </div>
-      )}
+                </Card>
+              );
+            })}
+          </div>
+        )}
+      </section>
     </main>
   );
 }
