@@ -299,7 +299,7 @@ export function ClothingFiltersMobile(props: Props) {
                 className="h-8 w-8 rounded-full bg-muted flex items-center justify-center"
               >
                 <X className="h-4 w-4" />
-              </button>
+              </button>  
             </div>
             <FiltersPanel {...props} />
             <div className="px-4 py-3 border-t sticky bottom-0 bg-white">
