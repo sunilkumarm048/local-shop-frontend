@@ -1,10 +1,25 @@
 'use client';
 
 import { useState } from 'react';
+import dynamic from 'next/dynamic';
 import { MapPin, ChevronDown, Gift } from 'lucide-react';
 
 import { useDeliveryLocation } from '@/stores/deliveryLocation';
-import { DeliveryLocationModal } from './DeliveryLocationModal';
+
+/**
+ * The modal contains a Leaflet map. Leaflet touches `window` at import
+ * time, so it can't be evaluated during Next.js static prerender (build
+ * fails with "ReferenceError: window is not defined").
+ *
+ * Same pattern the existing shop/ShopWizard.tsx uses for LocationPicker.
+ */
+const DeliveryLocationModal = dynamic(
+  () =>
+    import('./DeliveryLocationModal').then((m) => ({
+      default: m.DeliveryLocationModal,
+    })),
+  { ssr: false }
+);
 
 /**
  * Customer-page delivery bar:
@@ -70,7 +85,8 @@ export function DeliveryLocationBar() {
         </div>
       )}
 
-      <DeliveryLocationModal open={open} onClose={() => setOpen(false)} />
+      {/* Modal only mounted when opened — keeps leaflet chunk lazy */}
+      {open && <DeliveryLocationModal open={open} onClose={() => setOpen(false)} />}
     </div>
   );
 }
