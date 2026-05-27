@@ -1,11 +1,11 @@
 'use client';
 
 import { use, useEffect, useState } from 'react';
-import { Minus, Plus, ArrowLeft, ImageIcon } from 'lucide-react';
+import { Minus, Plus, ArrowLeft, ImageIcon, Zap } from 'lucide-react';
 import Link from 'next/link';
 
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { fetchShop, fetchShopProducts, type Shop, type Product } from '@/lib/shops';
 import { useCart } from '@/stores/cart';
 
@@ -89,84 +89,112 @@ export default function ShopDetailPage({ params }: PageProps) {
           This shop has not listed any products yet.
         </div>
       ) : (
-        <div className="grid sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
           {products.map((p) => {
             const inCart = cartItemsByProduct[p._id];
+            const isOut = !p.inStock || p.stock === 0;
+            const discountPct =
+              p.mrp && p.mrp > p.price
+                ? Math.round(((p.mrp - p.price) / p.mrp) * 100)
+                : 0;
+
             return (
-              <Card key={p._id}>
-                <CardContent className="p-4 flex gap-3">
-                  {/* Product thumbnail (or placeholder) — matches the owner's Products tab */}
+              <Card key={p._id} className="overflow-hidden flex flex-col">
+                {/* Square product image — full card width, like Blinkit/Zepto */}
+                <div className="relative aspect-square bg-muted">
+                  {discountPct > 0 && (
+                    <div className="absolute top-0 left-2 z-10 bg-primary text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-b">
+                      {discountPct}% OFF
+                    </div>
+                  )}
                   {p.image ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={p.image}
-                      alt=""
-                      className="h-16 w-16 rounded-md object-cover border shrink-0"
+                      alt={p.name}
+                      loading="lazy"
+                      className="w-full h-full object-cover"
                     />
                   ) : (
-                    <div className="h-16 w-16 rounded-md border bg-muted flex items-center justify-center shrink-0">
-                      <ImageIcon className="h-5 w-5 text-muted-foreground/50" />
+                    <div className="w-full h-full flex items-center justify-center">
+                      <ImageIcon className="h-8 w-8 text-muted-foreground/40" />
                     </div>
                   )}
+                </div>
 
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium truncate">{p.name}</div>
-                    {p.weight && (
-                      <div className="text-xs text-muted-foreground">{p.weight}</div>
-                    )}
-                    <div className="mt-2 flex items-center gap-2">
-                      <span className="font-semibold">₹{p.price}</span>
+                {/* Card body */}
+                <div className="p-2 flex-1 flex flex-col gap-1">
+                  {/* Delivery badge */}
+                  <div className="inline-flex items-center gap-1 text-[10px] font-semibold text-muted-foreground bg-muted px-1.5 py-0.5 rounded w-fit">
+                    <Zap className="h-2.5 w-2.5 fill-current" /> 15 MINS
+                  </div>
+
+                  {/* Name */}
+                  <div className="text-sm font-medium leading-tight line-clamp-2 min-h-[2.5rem]">
+                    {p.name}
+                  </div>
+
+                  {/* Weight */}
+                  <div className="text-xs text-muted-foreground">
+                    {p.weight || '1 unit'}
+                  </div>
+
+                  {/* Price + Add row, pinned to bottom */}
+                  <div className="flex items-center justify-between gap-2 mt-auto pt-1">
+                    <div className="flex flex-col leading-tight">
+                      <span className="font-semibold text-sm">₹{p.price}</span>
                       {p.mrp && p.mrp > p.price && (
-                        <span className="text-xs text-muted-foreground line-through">
+                        <span className="text-[10px] text-muted-foreground line-through">
                           ₹{p.mrp}
                         </span>
                       )}
                     </div>
-                  </div>
 
-                  {!p.inStock || p.stock === 0 ? (
-                    <span className="text-xs text-muted-foreground self-center">
-                      Out of stock
-                    </span>
-                  ) : inCart ? (
-                    <div className="flex items-center gap-2 self-center">
+                    {isOut ? (
+                      <span className="text-[10px] text-muted-foreground font-medium">
+                        Out
+                      </span>
+                    ) : inCart ? (
+                      <div className="flex items-center bg-primary text-primary-foreground rounded overflow-hidden">
+                        <button
+                          aria-label="Decrease quantity"
+                          className="w-7 h-7 flex items-center justify-center hover:bg-primary/85 transition"
+                          onClick={() => cart.setQty(p._id, inCart.qty - 1)}
+                        >
+                          <Minus className="h-3 w-3" />
+                        </button>
+                        <span className="text-xs font-bold w-5 text-center">
+                          {inCart.qty}
+                        </span>
+                        <button
+                          aria-label="Increase quantity"
+                          className="w-7 h-7 flex items-center justify-center hover:bg-primary/85 transition"
+                          onClick={() => cart.setQty(p._id, inCart.qty + 1)}
+                        >
+                          <Plus className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ) : (
                       <Button
                         variant="outline"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => cart.setQty(p._id, inCart.qty - 1)}
+                        size="sm"
+                        className="h-7 px-3 text-xs font-bold tracking-wider border-primary text-primary hover:bg-primary/10 hover:text-primary"
+                        onClick={() =>
+                          cart.add({
+                            productId: p._id,
+                            shopId: shop._id,
+                            name: p.name,
+                            price: p.price,
+                            weight: p.weight,
+                            image: p.image,
+                          })
+                        }
                       >
-                        <Minus className="h-3 w-3" />
+                        ADD
                       </Button>
-                      <span className="font-medium w-6 text-center">{inCart.qty}</span>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => cart.setQty(p._id, inCart.qty + 1)}
-                      >
-                        <Plus className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  ) : (
-                    <Button
-                      size="sm"
-                      className="self-center"
-                      onClick={() =>
-                        cart.add({
-                          productId: p._id,
-                          shopId: shop._id,
-                          name: p.name,
-                          price: p.price,
-                          weight: p.weight,
-                          image: p.image,
-                        })
-                      }
-                    >
-                      Add
-                    </Button>
-                  )}
-                </CardContent>
+                    )}
+                  </div>
+                </div>
               </Card>
             );
           })}
