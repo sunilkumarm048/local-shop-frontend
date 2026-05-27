@@ -699,3 +699,4 @@ function ProductsGrid({
     </section>
   );
 }
+              
