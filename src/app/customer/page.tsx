@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { MapPin, Search, Star } from 'lucide-react';
+import { Search, Star } from 'lucide-react';
 
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { getCurrentPosition } from '@/lib/geo';
 import { fetchNearbyShops, fetchCategoryTree, type Shop, type CategoryNode } from '@/lib/shops';
+import { DeliveryLocationBar } from '@/components/customer/DeliveryLocationBar';
+import { useDeliveryLocation } from '@/stores/deliveryLocation';
 
 export default function CustomerHome() {
   const [shops, setShops] = useState<Shop[]>([]);
@@ -15,15 +17,57 @@ export default function CustomerHome() {
   const [activeGroup, setActiveGroup] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [query, setQuery] = useState('');
-  const [coords, setCoords] = useState<{ lng: number; lat: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Get user location on mount
+  const lat = useDeliveryLocation((s) => s.lat);
+  const lng = useDeliveryLocation((s) => s.lng);
+  const setLocation = useDeliveryLocation((s) => s.setLocation);
+
+  /**
+   * On first mount, if the user hasn't set a delivery location yet, try a
+   * silent GPS detection and save it as "self" mode. Matches the legacy
+   * site's behavior of auto-filling without opening the modal.
+   *
+   * Reverse-geocode is fire-and-forget so the area name fills in shortly
+   * after; shop loading doesn't wait for it.
+   */
   useEffect(() => {
-    getCurrentPosition().then((c) => {
-      if (c) setCoords({ lng: c.longitude, lat: c.latitude });
+    if (lat != null && lng != null) return;
+    getCurrentPosition().then(async (c) => {
+      if (!c) return;
+      let areaName = '';
+      let address = '';
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?lat=${c.latitude}&lon=${c.longitude}&format=json&zoom=18&addressdetails=1`,
+          { headers: { 'Accept-Language': 'en' } }
+        );
+        const data = await res.json();
+        const a = data.address || {};
+        areaName =
+          a.suburb ||
+          a.neighbourhood ||
+          a.village ||
+          a.town ||
+          a.city_district ||
+          a.city ||
+          a.county ||
+          a.state ||
+          'Your area';
+        address = data.display_name || '';
+      } catch {
+        areaName = 'Your area';
+      }
+      setLocation({
+        mode: 'self',
+        lat: c.latitude,
+        lng: c.longitude,
+        address,
+        areaName,
+      });
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Load category tree once
@@ -33,13 +77,13 @@ export default function CustomerHome() {
       .catch(() => {});
   }, []);
 
-  // Load shops whenever filters change
+  // Load shops whenever filters or delivery location change
   useEffect(() => {
     setLoading(true);
     setError(null);
     fetchNearbyShops({
-      lng: coords?.lng,
-      lat: coords?.lat,
+      lng: lng ?? undefined,
+      lat: lat ?? undefined,
       radiusKm: 5,
       category: activeCategory || undefined,
       q: query || undefined,
@@ -47,31 +91,22 @@ export default function CustomerHome() {
       .then((r) => setShops(r.shops))
       .catch((e) => setError(e.message || 'Could not load shops'))
       .finally(() => setLoading(false));
-  }, [coords, activeCategory, query]);
+  }, [lat, lng, activeCategory, query]);
 
   return (
-    <main className="container py-6 space-y-6">
-      {/* Location + search */}
-      <div className="space-y-3">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <MapPin className="h-4 w-4 text-primary" />
-          {coords ? (
-            <span>
-              Showing shops near {coords.lat.toFixed(3)}, {coords.lng.toFixed(3)}
-            </span>
-          ) : (
-            <span>Location unavailable — showing all shops</span>
-          )}
-        </div>
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search shops, products..."
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            className="pl-9"
-          />
-        </div>
+    <main className="container py-5 space-y-5">
+      {/* Delivery location bar — chip + (optional) gift banner */}
+      <DeliveryLocationBar />
+
+      {/* Search */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Search shops, products..."
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          className="pl-9"
+        />
       </div>
 
       {/* Category groups — top-level strip */}
@@ -96,7 +131,7 @@ export default function CustomerHome() {
                 key={g._id}
                 onClick={() => {
                   setActiveGroup(activeGroup === g._id ? null : g._id);
-                  setActiveCategory(null); // reset subcategory when switching groups
+                  setActiveCategory(null);
                 }}
                 className={`shrink-0 px-3 py-1.5 rounded-full text-sm font-medium border ${
                   activeGroup === g._id
@@ -111,38 +146,39 @@ export default function CustomerHome() {
           </div>
 
           {/* Subcategory strip — appears only when a group is selected */}
-          {activeGroup && (() => {
-            const group = tree.find((g) => g._id === activeGroup);
-            if (!group || group.children.length === 0) return null;
-            return (
-              <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-none border-t pt-2">
-                <button
-                  onClick={() => setActiveCategory(null)}
-                  className={`shrink-0 px-3 py-1 rounded-full text-xs font-medium border ${
-                    activeCategory === null
-                      ? 'bg-brand-green text-white border-brand-green'
-                      : 'bg-card border-border hover:bg-muted'
-                  }`}
-                >
-                  All {group.name}
-                </button>
-                {group.children.map((c) => (
+          {activeGroup &&
+            (() => {
+              const group = tree.find((g) => g._id === activeGroup);
+              if (!group || group.children.length === 0) return null;
+              return (
+                <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-none border-t pt-2">
                   <button
-                    key={c._id}
-                    onClick={() => setActiveCategory(c._id)}
+                    onClick={() => setActiveCategory(null)}
                     className={`shrink-0 px-3 py-1 rounded-full text-xs font-medium border ${
-                      activeCategory === c._id
+                      activeCategory === null
                         ? 'bg-brand-green text-white border-brand-green'
                         : 'bg-card border-border hover:bg-muted'
                     }`}
                   >
-                    {c.icon && <span className="mr-1">{c.icon}</span>}
-                    {c.name}
+                    All {group.name}
                   </button>
-                ))}
-              </div>
-            );
-          })()}
+                  {group.children.map((c) => (
+                    <button
+                      key={c._id}
+                      onClick={() => setActiveCategory(c._id)}
+                      className={`shrink-0 px-3 py-1 rounded-full text-xs font-medium border ${
+                        activeCategory === c._id
+                          ? 'bg-brand-green text-white border-brand-green'
+                          : 'bg-card border-border hover:bg-muted'
+                      }`}
+                    >
+                      {c.icon && <span className="mr-1">{c.icon}</span>}
+                      {c.name}
+                    </button>
+                  ))}
+                </div>
+              );
+            })()}
         </div>
       )}
 
