@@ -1,7 +1,7 @@
 'use client';
 
 import { use, useEffect, useState } from 'react';
-import { Minus, Plus, ArrowLeft } from 'lucide-react';
+import { Minus, Plus, ArrowLeft, ImageIcon } from 'lucide-react';
 import Link from 'next/link';
 
 import { Button } from '@/components/ui/button';
@@ -95,6 +95,20 @@ export default function ShopDetailPage({ params }: PageProps) {
             return (
               <Card key={p._id}>
                 <CardContent className="p-4 flex gap-3">
+                  {/* Product thumbnail (or placeholder) — matches the owner's Products tab */}
+                  {p.image ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={p.image}
+                      alt=""
+                      className="h-16 w-16 rounded-md object-cover border shrink-0"
+                    />
+                  ) : (
+                    <div className="h-16 w-16 rounded-md border bg-muted flex items-center justify-center shrink-0">
+                      <ImageIcon className="h-5 w-5 text-muted-foreground/50" />
+                    </div>
+                  )}
+
                   <div className="flex-1 min-w-0">
                     <div className="font-medium truncate">{p.name}</div>
                     {p.weight && (
