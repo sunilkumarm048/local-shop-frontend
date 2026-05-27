@@ -116,8 +116,6 @@ export default function CustomerHome() {
   const lng = useDeliveryLocation((s) => s.lng);
   const setLocation = useDeliveryLocation((s) => s.setLocation);
 
-  const cart = useCart();
-
   /* ---------- Identify active group + clothing mode ---------- */
   const activeGroupNode = activeGroup
     ? tree.find((g) => g._id === activeGroup) || null
@@ -421,7 +419,6 @@ export default function CustomerHome() {
               selectedShop={selectedShop}
               setSelectedShopId={setSelectedShopId}
               query={query}
-              cart={cart}
               showShopBadge
             />
           </div>
@@ -443,7 +440,6 @@ export default function CustomerHome() {
             selectedShop={selectedShop}
             setSelectedShopId={setSelectedShopId}
             query={query}
-            cart={cart}
             showShopBadge={false}
           />
         </>
@@ -540,7 +536,6 @@ interface ProductsGridProps {
   selectedShop: Shop | null | undefined;
   setSelectedShopId: (id: string | null) => void;
   query: string;
-  cart: ReturnType<typeof useCart>;
   showShopBadge: boolean;
 }
 
@@ -550,9 +545,9 @@ function ProductsGrid({
   selectedShop,
   setSelectedShopId,
   query,
-  cart,
   showShopBadge,
 }: ProductsGridProps) {
+  const cart = useCart();
   return (
     <section className="space-y-3">
       <div className="flex items-center justify-between px-1">
