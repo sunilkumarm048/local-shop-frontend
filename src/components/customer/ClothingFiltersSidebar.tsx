@@ -1,9 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Check, Search, SlidersHorizontal, X } from 'lucide-react';
-
-import type { Category } from '@/lib/shops';
+import { Check, SlidersHorizontal, X } from 'lucide-react';
 
 /* ----------------------------------------------------------------------- */
 /* Shared types                                                             */
@@ -17,54 +15,54 @@ export const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: 'price-desc', label: 'Price: High to Low' },
 ];
 
+/** Discount thresholds, expressed as percentage off. null = no filter. */
+export const DISCOUNT_OPTIONS: { value: number; label: string }[] = [
+  { value: 10, label: '10% Off & above' },
+  { value: 20, label: '20% Off & above' },
+  { value: 30, label: '30% Off & above' },
+  { value: 50, label: '50% Off & above' },
+];
+
 export interface FiltersState {
-  selectedSubcategories: Set<string>;
   sortBy: SortKey;
-  priceMin: string; // string so the user can clear it back to empty
+  priceMin: string;
   priceMax: string;
+  /** Minimum discount % required (null = no filter). */
+  minDiscount: number | null;
+  /** Hide out-of-stock items. */
+  inStockOnly: boolean;
 }
 
 export const EMPTY_FILTERS: FiltersState = {
-  selectedSubcategories: new Set<string>(),
   sortBy: 'relevance',
   priceMin: '',
   priceMax: '',
+  minDiscount: null,
+  inStockOnly: false,
 };
 
 interface Props {
-  subcategories: Category[];
   filters: FiltersState;
   onChange: (next: FiltersState) => void;
   productCount: number;
 }
 
 /* ----------------------------------------------------------------------- */
-/* Inner panel — same markup is used for desktop sidebar AND mobile drawer  */
+/* Inner panel — shared by desktop sidebar AND mobile drawer                */
 /* ----------------------------------------------------------------------- */
 
-function FiltersPanel({ subcategories, filters, onChange, productCount }: Props) {
-  const [catSearch, setCatSearch] = useState('');
-  const filteredCats = subcategories.filter((c) =>
-    c.name.toLowerCase().includes(catSearch.toLowerCase())
-  );
-
-  const toggleSubcat = (id: string) => {
-    const next = new Set(filters.selectedSubcategories);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    onChange({ ...filters, selectedSubcategories: next });
-  };
-
+function FiltersPanel({ filters, onChange, productCount }: Props) {
   const clearAll = () =>
     onChange({
       ...EMPTY_FILTERS,
-      sortBy: filters.sortBy, // sort isn't really a "filter"
+      sortBy: filters.sortBy, // sort isn't really a "filter" — preserve it
     });
 
   const activeCount =
-    filters.selectedSubcategories.size +
     (filters.priceMin ? 1 : 0) +
-    (filters.priceMax ? 1 : 0);
+    (filters.priceMax ? 1 : 0) +
+    (filters.minDiscount != null ? 1 : 0) +
+    (filters.inStockOnly ? 1 : 0);
 
   return (
     <div className="bg-card">
@@ -112,59 +110,68 @@ function FiltersPanel({ subcategories, filters, onChange, productCount }: Props)
         )}
       </div>
 
-      {/* Category */}
+      {/* Discount — single-select like Meesho */}
       <div className="px-4 py-3 border-b">
-        <div className="text-[13px] font-bold mb-2">Category</div>
-
-        {/* Search within categories */}
-        {subcategories.length > 5 && (
-          <div className="relative mb-2">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-            <input
-              value={catSearch}
-              onChange={(e) => setCatSearch(e.target.value)}
-              placeholder="Search"
-              className="w-full pl-8 pr-2.5 py-1.5 text-xs bg-muted border rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
-            />
-          </div>
-        )}
-
-        {/* Checklist */}
-        <div className="space-y-0.5 max-h-64 overflow-y-auto">
-          {filteredCats.length === 0 ? (
-            <div className="text-[11px] text-muted-foreground py-2">
-              No match
-            </div>
-          ) : (
-            filteredCats.map((c) => {
-              const checked = filters.selectedSubcategories.has(c._id);
-              return (
-                <button
-                  key={c._id}
-                  type="button"
-                  onClick={() => toggleSubcat(c._id)}
-                  className="w-full flex items-center gap-2 py-1.5 px-1 rounded hover:bg-muted/50 text-left"
+        <div className="text-[13px] font-bold mb-2">Discount</div>
+        <div className="space-y-0.5">
+          {DISCOUNT_OPTIONS.map((d) => {
+            const checked = filters.minDiscount === d.value;
+            return (
+              <button
+                key={d.value}
+                type="button"
+                onClick={() =>
+                  onChange({
+                    ...filters,
+                    minDiscount: checked ? null : d.value,
+                  })
+                }
+                className="w-full flex items-center gap-2 py-1.5 px-1 rounded hover:bg-muted/50 text-left"
+              >
+                <span
+                  className={`h-4 w-4 rounded-full border-2 flex items-center justify-center shrink-0 transition ${
+                    checked
+                      ? 'border-primary'
+                      : 'border-muted-foreground/40'
+                  }`}
                 >
-                  <span
-                    className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 transition ${
-                      checked
-                        ? 'bg-primary border-primary'
-                        : 'bg-card border-muted-foreground/40'
-                    }`}
-                  >
-                    {checked && (
-                      <Check className="h-3 w-3 text-primary-foreground" strokeWidth={3} />
-                    )}
-                  </span>
-                  <span className="text-[13px] flex-1">
-                    {c.icon && <span className="mr-1">{c.icon}</span>}
-                    {c.name}
-                  </span>
-                </button>
-              );
-            })
-          )}
+                  {checked && (
+                    <span className="h-2 w-2 rounded-full bg-primary" />
+                  )}
+                </span>
+                <span className="text-[13px] flex-1">{d.label}</span>
+              </button>
+            );
+          })}
         </div>
+      </div>
+
+      {/* Availability */}
+      <div className="px-4 py-3 border-b">
+        <div className="text-[13px] font-bold mb-2">Availability</div>
+        <button
+          type="button"
+          onClick={() =>
+            onChange({ ...filters, inStockOnly: !filters.inStockOnly })
+          }
+          className="w-full flex items-center gap-2 py-1.5 px-1 rounded hover:bg-muted/50 text-left"
+        >
+          <span
+            className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 transition ${
+              filters.inStockOnly
+                ? 'bg-primary border-primary'
+                : 'bg-card border-muted-foreground/40'
+            }`}
+          >
+            {filters.inStockOnly && (
+              <Check
+                className="h-3 w-3 text-primary-foreground"
+                strokeWidth={3}
+              />
+            )}
+          </span>
+          <span className="text-[13px] flex-1">In stock only</span>
+        </button>
       </div>
 
       {/* Price range */}
@@ -178,7 +185,10 @@ function FiltersPanel({ subcategories, filters, onChange, productCount }: Props)
             placeholder="Min"
             value={filters.priceMin}
             onChange={(e) =>
-              onChange({ ...filters, priceMin: e.target.value.replace(/[^\d]/g, '') })
+              onChange({
+                ...filters,
+                priceMin: e.target.value.replace(/[^\d]/g, ''),
+              })
             }
             className="w-full px-2 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
           />
@@ -190,12 +200,15 @@ function FiltersPanel({ subcategories, filters, onChange, productCount }: Props)
             placeholder="Max"
             value={filters.priceMax}
             onChange={(e) =>
-              onChange({ ...filters, priceMax: e.target.value.replace(/[^\d]/g, '') })
+              onChange({
+                ...filters,
+                priceMax: e.target.value.replace(/[^\d]/g, ''),
+              })
             }
             className="w-full px-2 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
           />
         </div>
-        <div className="flex gap-1.5 mt-2">
+        <div className="flex flex-wrap gap-1.5 mt-2">
           {[
             { lbl: '< ₹200', min: '', max: '200' },
             { lbl: '₹200–500', min: '200', max: '500' },
@@ -203,7 +216,8 @@ function FiltersPanel({ subcategories, filters, onChange, productCount }: Props)
             { lbl: '> ₹1000', min: '1000', max: '' },
           ].map((preset) => {
             const active =
-              filters.priceMin === preset.min && filters.priceMax === preset.max;
+              filters.priceMin === preset.min &&
+              filters.priceMax === preset.max;
             return (
               <button
                 key={preset.lbl}
@@ -249,9 +263,10 @@ export function ClothingFiltersSidebar(props: Props) {
 export function ClothingFiltersMobile(props: Props) {
   const [open, setOpen] = useState(false);
   const activeCount =
-    props.filters.selectedSubcategories.size +
     (props.filters.priceMin ? 1 : 0) +
-    (props.filters.priceMax ? 1 : 0);
+    (props.filters.priceMax ? 1 : 0) +
+    (props.filters.minDiscount != null ? 1 : 0) +
+    (props.filters.inStockOnly ? 1 : 0);
 
   return (
     <>
