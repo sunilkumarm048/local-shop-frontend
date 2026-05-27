@@ -168,12 +168,10 @@ export default function CustomerHome() {
       .catch(() => {});
   }, []);
 
-  /* ---------- Shops: query depends on whether sidebar mode is active ----------
+  /* ---------- Shops query ----------
    *
-   * Sidebar mode (clothing) needs multi-select, which the backend doesn't
-   * support on a single param — so for that mode we fetch shops by location
-   * only and filter client-side. Other modes keep the existing single-category
-   * server-side filter (lighter network traffic).
+   * Single category param works for every group now — even in clothing mode,
+   * because the horizontal subcategory pill strip uses single-select.
    */
   useEffect(() => {
     setLoading(true);
@@ -182,14 +180,13 @@ export default function CustomerHome() {
       lng: lng ?? undefined,
       lat: lat ?? undefined,
       radiusKm: 5,
-      // Skip server-side category filter in clothing/sidebar mode
-      category: clothingMode ? undefined : activeCategory || undefined,
+      category: activeCategory || undefined,
       q: query || undefined,
     })
       .then((r) => setShops(r.shops))
       .catch((e) => setError(e.message || 'Could not load shops'))
       .finally(() => setLoading(false));
-  }, [lat, lng, activeCategory, query, clothingMode]);
+  }, [lat, lng, activeCategory, query]);
 
   /* ---------- Reset filters when group changes ---------- */
   useEffect(() => {
@@ -199,35 +196,21 @@ export default function CustomerHome() {
 
   /* ---------- Distance + sort by nearest ---------- */
   const shopsWithDistance = useMemo(() => {
-    const withDist = (lat == null || lng == null)
-      ? shops.map((s) => ({ shop: s, km: null as number | null }))
-      : shops.map((s) => {
-          const [slng, slat] = s.location.coordinates;
-          return { shop: s, km: haversineKm(lat, lng, slat, slng) };
-        });
+    const withDist =
+      lat == null || lng == null
+        ? shops.map((s) => ({ shop: s, km: null as number | null }))
+        : shops.map((s) => {
+            const [slng, slat] = s.location.coordinates;
+            return { shop: s, km: haversineKm(lat, lng, slat, slng) };
+          });
 
-    // In clothing mode, narrow to shops whose category is in this group's children
-    let filtered = withDist;
-    if (clothingMode && activeGroupNode) {
-      const childIds = new Set(activeGroupNode.children.map((c) => c._id));
-      filtered = filtered.filter((x) =>
-        x.shop.category ? childIds.has(x.shop.category) : false
-      );
-      // Further narrow by sidebar's selected subcategories (if any)
-      if (filters.selectedSubcategories.size > 0) {
-        filtered = filtered.filter((x) =>
-          x.shop.category ? filters.selectedSubcategories.has(x.shop.category) : false
-        );
-      }
-    }
-
-    return filtered.sort((a, b) => {
+    return withDist.sort((a, b) => {
       if (a.km == null && b.km == null) return 0;
       if (a.km == null) return 1;
       if (b.km == null) return -1;
       return a.km - b.km;
     });
-  }, [shops, lat, lng, clothingMode, activeGroupNode, filters.selectedSubcategories]);
+  }, [shops, lat, lng]);
 
   /* ---------- All Products feed ---------- */
   useEffect(() => {
@@ -266,6 +249,21 @@ export default function CustomerHome() {
         const max = Number(filters.priceMax);
         list = list.filter((x) => x.product.price <= max);
       }
+      // Minimum discount %
+      if (filters.minDiscount != null) {
+        list = list.filter((x) => {
+          const { price, mrp } = x.product;
+          if (!mrp || mrp <= price) return false;
+          const pct = Math.round(((mrp - price) / mrp) * 100);
+          return pct >= (filters.minDiscount as number);
+        });
+      }
+      // In-stock only
+      if (filters.inStockOnly) {
+        list = list.filter(
+          (x) => x.product.inStock !== false && x.product.stock !== 0
+        );
+      }
       list = applySort(list, filters.sortBy);
     }
     return list;
@@ -277,6 +275,8 @@ export default function CustomerHome() {
     clothingMode,
     filters.priceMin,
     filters.priceMax,
+    filters.minDiscount,
+    filters.inStockOnly,
     filters.sortBy,
   ]);
 
@@ -336,8 +336,8 @@ export default function CustomerHome() {
         </div>
       )}
 
-      {/* Horizontal subcategory pills — hidden in clothing/sidebar mode */}
-      {activeGroup && !clothingMode &&
+      {/* Horizontal subcategory pill strip — always shown when a group is selected */}
+      {activeGroup &&
         (() => {
           const group = tree.find((g) => g._id === activeGroup);
           if (!group || group.children.length === 0) return null;
@@ -383,7 +383,6 @@ export default function CustomerHome() {
       {clothingMode && activeGroupNode ? (
         <div className="flex gap-5">
           <ClothingFiltersSidebar
-            subcategories={activeGroupNode.children}
             filters={filters}
             onChange={setFilters}
             productCount={allProducts.length}
@@ -397,7 +396,6 @@ export default function CustomerHome() {
                 {activeGroupNode.name}
               </h2>
               <ClothingFiltersMobile
-                subcategories={activeGroupNode.children}
                 filters={filters}
                 onChange={setFilters}
                 productCount={allProducts.length}
