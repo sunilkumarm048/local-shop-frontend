@@ -56,6 +56,10 @@ export function ShopWizard({ onCreated }: Props) {
   const [locationError, setLocationError] = useState<string | null>(null);
   const [categories, setCategories] = useState<CategoryNode[]>([]);
   const [serverError, setServerError] = useState<string | null>(null);
+  // Own submit flag — RHF's formState.isSubmitting can get stuck if a request
+  // hangs or the error path doesn't settle the promise (e.g. 401 token expiry).
+  // A manual flag with a guaranteed finally() always resets the button.
+  const [submitting, setSubmitting] = useState(false);
 
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -103,6 +107,7 @@ export function ShopWizard({ onCreated }: Props) {
       setLocationError('Drop a pin on the map to set your shop location.');
       return;
     }
+    setSubmitting(true);
     try {
       const { shop } = await createShop({
         name: data.name,
@@ -122,7 +127,18 @@ export function ShopWizard({ onCreated }: Props) {
       });
       onCreated(shop);
     } catch (err) {
-      setServerError(err instanceof ApiError ? err.message : 'Could not create your shop.');
+      // Surface a useful message. 401 = expired/invalid session — tell the
+      // owner to sign in again rather than leaving them staring at a spinner.
+      if (err instanceof ApiError && err.status === 401) {
+        setServerError('Your session has expired. Please log out and sign in again, then retry.');
+      } else if (err instanceof ApiError) {
+        setServerError(err.message);
+      } else {
+        setServerError('Could not create your shop. Check your connection and try again.');
+      }
+    } finally {
+      // ALWAYS reset — success, handled error, or unexpected throw.
+      setSubmitting(false);
     }
   });
 
@@ -315,8 +331,8 @@ export function ShopWizard({ onCreated }: Props) {
             </div>
           )}
 
-          <Button type="submit" disabled={form.formState.isSubmitting} className="w-full sm:w-auto">
-            {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          <Button type="submit" disabled={submitting} className="w-full sm:w-auto">
+            {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Create shop
           </Button>
         </form>
