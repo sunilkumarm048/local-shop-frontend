@@ -13,6 +13,7 @@ import {
   PackageCheck,
   Scissors,
   Bell,
+  BellOff,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -21,6 +22,11 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/stores/auth';
 import { getSocket } from '@/lib/socket';
 import { ApiError } from '@/lib/api';
+import {
+  playNotification,
+  isNotificationMuted,
+  setNotificationMuted,
+} from '@/lib/notificationSound';
 import {
   fetchShopOrders,
   fetchOrderSiblings,
@@ -83,6 +89,14 @@ export function OrdersTab({ shopId }: Props) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [tab, setTab] = useState<TabId>('all');
   const [newPing, setNewPing] = useState(false);
+  // Notification sound mute toggle. Initial value is read from localStorage
+  // on mount (after hydration) — we can't read it during render because that
+  // would mismatch SSR. The initial false here is fine for the first paint
+  // since unmute is the default state for everyone anyway.
+  const [muted, setMuted] = useState(false);
+  useEffect(() => {
+    setMuted(isNotificationMuted());
+  }, []);
 
   // Keep a ref of the current orders so the socket handler (registered once)
   // can read fresh state without re-subscribing on every update.
@@ -114,6 +128,7 @@ export function OrdersTab({ shopId }: Props) {
     function onNewOrder() {
       // A new order landed for one of the owner's shops. Re-fetch the list
       // (cheap, capped at 200) rather than trying to merge a partial payload.
+      playNotification();
       setNewPing(true);
       setTimeout(() => setNewPing(false), 4_000);
       refresh();
@@ -174,9 +189,28 @@ export function OrdersTab({ shopId }: Props) {
             {orders ? `${counts.all} active` : 'Loading…'} · updates live
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={refresh}>
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="icon"
+            aria-label={muted ? 'Unmute order sound' : 'Mute order sound'}
+            title={muted ? 'Order sound is off — tap to turn on' : 'Order sound is on — tap to mute'}
+            onClick={() => {
+              const next = !muted;
+              setMuted(next);
+              setNotificationMuted(next);
+              // Play once on unmute so the owner hears what to expect AND
+              // so the browser unlocks autoplay for subsequent events.
+              if (!next) playNotification();
+            }}
+            className={muted ? 'text-muted-foreground' : 'text-brand-green'}
+          >
+            {muted ? <BellOff className="h-4 w-4" /> : <Bell className="h-4 w-4" />}
+          </Button>
+          <Button variant="outline" size="sm" onClick={refresh}>
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {loadError && (
