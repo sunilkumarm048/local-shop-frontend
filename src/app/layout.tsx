@@ -3,8 +3,6 @@ import { Inter } from 'next/font/google';
 import './globals.css';
 import { PWARegistration } from '@/components/pwa/PWARegistration';
 import { VoiceButton } from '@/components/voice/VoiceButton';
-import { NotificationToaster } from '@/components/notifications/NotificationToaster';
-import { NotificationListener } from '@/components/notifications/NotificationListener';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -38,8 +36,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {children}
         <PWARegistration />
         <VoiceButton />
-        <NotificationToaster />
-        <NotificationListener />
       </body>
     </html>
   );
