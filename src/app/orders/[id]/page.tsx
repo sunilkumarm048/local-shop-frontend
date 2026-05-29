@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { use, useEffect, useState } from 'react';
+import { use, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { CheckCircle2, Clock, Package, Truck, PackageCheck, Bike } from 'lucide-react';
 
@@ -11,6 +11,11 @@ import { Button } from '@/components/ui/button';
 import { fetchOrder } from '@/lib/orders';
 import { useAuth } from '@/stores/auth';
 import { getSocket } from '@/lib/socket';
+import {
+  initNotificationSound,
+  playCustomerUpdate,
+} from '@/lib/notificationSound';
+import { PushSetup } from '@/components/notifications/PushSetup';
 
 // Leaflet on the map → dynamic with ssr:false. Reuses the delivery-side map
 // component (it doesn't care who's viewing it).
@@ -88,9 +93,20 @@ export default function OrderDetailPage({ params }: PageProps) {
 
   useEffect(() => {
     fetchOrder(id)
-      .then((r) => setOrder(r.order as unknown as OrderShape))
+      .then((r) => {
+        const ord = r.order as unknown as OrderShape;
+        setOrder(ord);
+        seenStatusRef.current = ord.status; // seed so first socket event doesn't chime
+      })
       .catch((e) => setError(e.message || 'Could not load order'));
   }, [id]);
+
+  // Init audio + prevent the initial fetch from triggering a chime (we only
+  // want to chime on REAL transitions, not the first render).
+  const seenStatusRef = useRef<string | null>(null);
+  useEffect(() => {
+    initNotificationSound();
+  }, []);
 
   // Subscribe to live updates for this order.
   // Phase 4b/5a backend emits `order:status_update` (NOT `order:status` —
@@ -104,9 +120,17 @@ export default function OrderDetailPage({ params }: PageProps) {
     socket.emit('order:join', { orderId: id });
 
     function onStatusUpdate(payload: { orderId: string; status: string }) {
-      if (payload.orderId === id) {
-        setOrder((prev) => (prev ? { ...prev, status: payload.status } : prev));
+      if (payload.orderId !== id) return;
+      // Chime only on a real status CHANGE — the first event after the fetch
+      // primes the ref, so we don't chime on initial reconciliation.
+      if (
+        seenStatusRef.current !== null &&
+        seenStatusRef.current !== payload.status
+      ) {
+        playCustomerUpdate();
       }
+      seenStatusRef.current = payload.status;
+      setOrder((prev) => (prev ? { ...prev, status: payload.status } : prev));
     }
 
     function onPartnerLocation(payload: { orderId: string; lat: number; lng: number }) {
@@ -179,6 +203,11 @@ export default function OrderDetailPage({ params }: PageProps) {
     <>
       <Header />
       <main className="container py-6 space-y-6 max-w-2xl">
+        <PushSetup
+          headline="Get order updates"
+          subline="Know the moment your order is accepted, on the way, and delivered \u2014 even with the app closed."
+        />
+
         <div>
           <h1 className="text-2xl font-bold">Order from {order.shop.name}</h1>
           <p className="text-sm text-muted-foreground">
