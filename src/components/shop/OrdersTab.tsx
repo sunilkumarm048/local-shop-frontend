@@ -23,10 +23,12 @@ import { useAuth } from '@/stores/auth';
 import { getSocket } from '@/lib/socket';
 import { ApiError } from '@/lib/api';
 import {
-  playNotification,
-  isNotificationMuted,
-  setNotificationMuted,
+  initNotificationSound,
+  playShopOrder,
+  isShopSoundMuted,
+  setShopSoundMuted,
 } from '@/lib/notificationSound';
+import { PushSetup } from '@/components/notifications/PushSetup';
 import {
   fetchShopOrders,
   fetchOrderSiblings,
@@ -89,13 +91,11 @@ export function OrdersTab({ shopId }: Props) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [tab, setTab] = useState<TabId>('all');
   const [newPing, setNewPing] = useState(false);
-  // Notification sound mute toggle. Initial value is read from localStorage
-  // on mount (after hydration) — we can't read it during render because that
-  // would mismatch SSR. The initial false here is fine for the first paint
-  // since unmute is the default state for everyone anyway.
+  // Notification sound mute toggle (shop channel).
   const [muted, setMuted] = useState(false);
   useEffect(() => {
-    setMuted(isNotificationMuted());
+    initNotificationSound();
+    setMuted(isShopSoundMuted());
   }, []);
 
   // Keep a ref of the current orders so the socket handler (registered once)
@@ -128,7 +128,7 @@ export function OrdersTab({ shopId }: Props) {
     function onNewOrder() {
       // A new order landed for one of the owner's shops. Re-fetch the list
       // (cheap, capped at 200) rather than trying to merge a partial payload.
-      playNotification();
+      playShopOrder();
       setNewPing(true);
       setTimeout(() => setNewPing(false), 4_000);
       refresh();
@@ -174,10 +174,37 @@ export function OrdersTab({ shopId }: Props) {
 
   return (
     <div className="space-y-4">
+      {/* Push setup banner — shows only when push isn't enabled. PushSetup
+          handles default/denied/granted-unsubscribed states; it renders null
+          when fully subscribed. */}
+      <PushSetup
+        headline="Get alerts when orders arrive"
+        subline="Even when the app is closed or your phone is locked. Recommended for shop owners."
+      />
+
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div>
-          <h2 className="text-xl font-semibold flex items-center gap-2">
+          <h2 className="text-xl font-semibold flex items-center gap-2 flex-wrap">
             Orders
+            <button
+              type="button"
+              aria-label={muted ? 'Unmute order sound' : 'Mute order sound'}
+              title={muted ? 'Order sound is off — tap to turn on' : 'Order sound is on — tap to mute'}
+              onClick={() => {
+                const next = !muted;
+                setMuted(next);
+                setShopSoundMuted(next);
+                // Confirmation chime + unlocks autoplay for the rest of the session
+                if (!next) playShopOrder();
+              }}
+              className={`inline-flex items-center justify-center h-8 w-8 rounded-full border transition ${
+                muted
+                  ? 'border-border bg-muted text-muted-foreground hover:bg-muted/70'
+                  : 'border-brand-green/30 bg-brand-greenLight text-brand-green hover:bg-brand-green/15'
+              }`}
+            >
+              {muted ? <BellOff className="h-4 w-4" /> : <Bell className="h-4 w-4" />}
+            </button>
             {newPing && (
               <span className="inline-flex items-center gap-1 text-xs font-medium text-brand-green">
                 <Bell className="h-3.5 w-3.5 animate-bounce" />
@@ -185,32 +212,17 @@ export function OrdersTab({ shopId }: Props) {
               </span>
             )}
           </h2>
-          <p className="text-sm text-muted-foreground">
-            {orders ? `${counts.all} active` : 'Loading…'} · updates live
+          <p className="text-sm text-muted-foreground flex items-center gap-2 flex-wrap">
+            <span>{orders ? `${counts.all} active` : 'Loading…'} · updates live</span>
+            <PushSetup
+              headline=""
+              subline=""
+            />
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="icon"
-            aria-label={muted ? 'Unmute order sound' : 'Mute order sound'}
-            title={muted ? 'Order sound is off — tap to turn on' : 'Order sound is on — tap to mute'}
-            onClick={() => {
-              const next = !muted;
-              setMuted(next);
-              setNotificationMuted(next);
-              // Play once on unmute so the owner hears what to expect AND
-              // so the browser unlocks autoplay for subsequent events.
-              if (!next) playNotification();
-            }}
-            className={muted ? 'text-muted-foreground' : 'text-brand-green'}
-          >
-            {muted ? <BellOff className="h-4 w-4" /> : <Bell className="h-4 w-4" />}
-          </Button>
-          <Button variant="outline" size="sm" onClick={refresh}>
-            Refresh
-          </Button>
-        </div>
+        <Button variant="outline" size="sm" onClick={refresh}>
+          Refresh
+        </Button>
       </div>
 
       {loadError && (
@@ -538,4 +550,3 @@ function OrderActions({ order, busy, runAction }: ActionsProps) {
   // picked_up / out_for_delivery / delivered / cancelled — no owner action
   return null;
 }
-  
