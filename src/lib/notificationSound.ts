@@ -1,123 +1,153 @@
 /**
- * Notification sound — robust version.
+ * Notification sounds — multi-channel.
  *
- * Two design decisions matter:
+ * Three independent channels, each with its own:
+ *   - audio file in /public/sounds/
+ *   - mute preference in localStorage (so a user with multiple roles can
+ *     mute one channel without affecting the others)
+ *   - public `play*()` function
  *
- * 1) We keep a single primed HTMLAudioElement (`primed`) but ALSO clone it on
- *    every play(). The clone strategy means a previous in-flight play() can
- *    never reject the new one with "interrupted" — each call gets its own
- *    element. This trades a bit of memory for reliability.
- *
- * 2) We "unlock" the audio context on the FIRST user gesture anywhere on the
- *    page (click, keydown, touchstart). Browsers require a user gesture before
- *    audio can play; after that gesture, audio plays freely for the rest of the
- *    session. By doing this once on any input, all later automatic events
- *    (like a Socket.IO order:new) play without issue.
- *
- * Mute preference persists in localStorage under `localshop-sound-muted`.
+ * Implementation notes:
+ *   1. One "primed" Audio element per channel, lazily created on first use.
+ *   2. Each play() *clones* the primed element so concurrent calls never
+ *      collide (a play-in-flight can't interrupt a fresh play).
+ *   3. A single page-level "unlock" listener installed on first user gesture
+ *      silently runs play()+pause() on every primed element, satisfying
+ *      browser autoplay rules for all later automatic triggers (Socket.IO,
+ *      timers, etc).
  */
 
-const STORAGE_KEY = 'localshop-sound-muted';
-const SOUND_SRC = '/sounds/order-notification.mp3';
+const SRC = {
+  shop: '/sounds/shop-new-order.mp3',
+  customer: '/sounds/customer-update.mp3',
+  delivery: '/sounds/delivery-new-job.mp3',
+} as const;
 
-let primed: HTMLAudioElement | null = null;
+const STORAGE_KEY = {
+  shop: 'localshop-sound-muted-shop',
+  customer: 'localshop-sound-muted-customer',
+  delivery: 'localshop-sound-muted-delivery',
+} as const;
+
+type Channel = keyof typeof SRC;
+
+const primed: Partial<Record<Channel, HTMLAudioElement>> = {};
 let unlocked = false;
 
-function getPrimed(): HTMLAudioElement | null {
+function getPrimed(channel: Channel): HTMLAudioElement | null {
   if (typeof window === 'undefined') return null;
-  if (!primed) {
-    primed = new Audio(SOUND_SRC);
-    primed.preload = 'auto';
-    primed.volume = 0.7;
-    primed.load();
+  if (!primed[channel]) {
+    const el = new Audio(SRC[channel]);
+    el.preload = 'auto';
+    el.volume = 0.7;
+    el.load();
+    primed[channel] = el;
   }
-  return primed;
+  return primed[channel] || null;
 }
 
 /**
- * Install a one-time user-gesture listener that "unlocks" autoplay by
- * issuing a silent play()+pause() on the primed element. Safe to call
- * many times — it self-removes after the first gesture.
+ * Install a one-time user-gesture listener that unlocks audio playback for
+ * ALL channels by issuing a silent play()+pause() on each primed element.
  */
 function installUnlockListener() {
   if (typeof window === 'undefined' || unlocked) return;
+
   const unlock = () => {
-    const el = getPrimed();
-    if (!el) return;
-    // Silent prime: play muted, then pause and reset volume.
-    const prevVol = el.volume;
-    el.volume = 0;
-    el
-      .play()
-      .then(() => {
-        el.pause();
-        el.currentTime = 0;
-        el.volume = prevVol;
+    const channels: Channel[] = ['shop', 'customer', 'delivery'];
+    let okCount = 0;
+
+    Promise.all(
+      channels.map((c) => {
+        const el = getPrimed(c);
+        if (!el) return Promise.resolve();
+        const prevVol = el.volume;
+        el.volume = 0;
+        return el
+          .play()
+          .then(() => {
+            el.pause();
+            el.currentTime = 0;
+            el.volume = prevVol;
+            okCount += 1;
+          })
+          .catch(() => {
+            // try again next gesture
+          });
+      })
+    ).then(() => {
+      if (okCount > 0) {
         unlocked = true;
-        // Now that we know it worked, take the listeners off.
         window.removeEventListener('click', unlock);
         window.removeEventListener('keydown', unlock);
         window.removeEventListener('touchstart', unlock);
-      })
-      .catch(() => {
-        // gesture wasn't enough on this browser — leave listeners attached
-        // and try again on next gesture
-      });
+      }
+    });
   };
+
   window.addEventListener('click', unlock, { passive: true });
   window.addEventListener('keydown', unlock, { passive: true });
   window.addEventListener('touchstart', unlock, { passive: true });
 }
 
-/** Is the notification sound currently muted? */
-export function isNotificationMuted(): boolean {
+/* --------------- mute preference helpers --------------- */
+
+function isMuted(channel: Channel): boolean {
   if (typeof window === 'undefined') return false;
   try {
-    return window.localStorage.getItem(STORAGE_KEY) === '1';
+    return window.localStorage.getItem(STORAGE_KEY[channel]) === '1';
   } catch {
     return false;
   }
 }
 
-/** Persist the mute preference. */
-export function setNotificationMuted(muted: boolean): void {
+function setMuted(channel: Channel, muted: boolean): void {
   if (typeof window === 'undefined') return;
   try {
-    if (muted) window.localStorage.setItem(STORAGE_KEY, '1');
-    else window.localStorage.removeItem(STORAGE_KEY);
+    if (muted) window.localStorage.setItem(STORAGE_KEY[channel], '1');
+    else window.localStorage.removeItem(STORAGE_KEY[channel]);
   } catch {
-    /* private mode / storage disabled */
+    /* storage disabled — ignore */
   }
 }
 
-/**
- * Initialize the sound system. Call once near app boot (or on OrdersTab
- * mount). Primes the audio element and installs the autoplay unlock.
- */
-export function initNotificationSound(): void {
-  if (typeof window === 'undefined') return;
-  getPrimed();
-  installUnlockListener();
-}
+/* --------------- core play() --------------- */
 
-/**
- * Play the notification chime.
- *
- * Uses a *clone* of the primed element so concurrent calls never collide.
- * If the browser still blocks playback (no gesture yet), logs once and
- * exits silently — no console spam.
- */
-export function playNotification(): void {
-  if (isNotificationMuted()) return;
-  const base = getPrimed();
+function play(channel: Channel): void {
+  if (isMuted(channel)) return;
+  const base = getPrimed(channel);
   if (!base) return;
-
-  // Clone so a previous play in flight can't interrupt this one.
   const el = base.cloneNode(true) as HTMLAudioElement;
   el.volume = 0.7;
   el.play().catch((err) => {
-    // Most common cause: no user gesture on the page yet. Helpful for debugging.
     // eslint-disable-next-line no-console
-    console.warn('[notification sound] play() blocked:', err?.name || err);
+    console.warn(`[notification sound:${channel}] play() blocked:`, err?.name || err);
   });
 }
+
+/* --------------- public API --------------- */
+
+/** Call once near app boot (or first time a sound-using page mounts). */
+export function initNotificationSound(): void {
+  if (typeof window === 'undefined') return;
+  // Prime all three so the first play has zero latency
+  getPrimed('shop');
+  getPrimed('customer');
+  getPrimed('delivery');
+  installUnlockListener();
+}
+
+/* Shop owner — new order */
+export const playShopOrder = () => play('shop');
+export const isShopSoundMuted = () => isMuted('shop');
+export const setShopSoundMuted = (m: boolean) => setMuted('shop', m);
+
+/* Customer — order status update */
+export const playCustomerUpdate = () => play('customer');
+export const isCustomerSoundMuted = () => isMuted('customer');
+export const setCustomerSoundMuted = (m: boolean) => setMuted('customer', m);
+
+/* Delivery partner — new job assigned */
+export const playDeliveryJob = () => play('delivery');
+export const isDeliverySoundMuted = () => isMuted('delivery');
+export const setDeliverySoundMuted = (m: boolean) => setMuted('delivery', m);
