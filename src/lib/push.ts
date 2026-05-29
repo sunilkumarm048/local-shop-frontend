@@ -92,7 +92,12 @@ export async function subscribeToPush(token: string): Promise<PushStatus> {
   if (!sub) {
     sub = await reg.pushManager.subscribe({
       userVisibleOnly: true, // spec requires this
-      applicationServerKey: urlBase64ToUint8Array(publicKey),
+      // The `as BufferSource` cast works around a TypeScript 5.7+ strictness:
+      // `Uint8Array<ArrayBufferLike>` isn't directly assignable to
+      // `ArrayBufferView<ArrayBuffer>` because ArrayBufferLike includes
+      // SharedArrayBuffer. The runtime value is fine — atob() never produces
+      // a SharedArrayBuffer-backed view.
+      applicationServerKey: urlBase64ToUint8Array(publicKey) as BufferSource,
     });
   }
 
