@@ -28,6 +28,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/stores/auth';
+import {
+  initNotificationSound,
+  playDeliveryJob,
+} from '@/lib/notificationSound';
+import { PushSetup } from '@/components/notifications/PushSetup';
 import { useUser } from '@/hooks/useUser';
 import { logout } from '@/lib/auth';
 import { getSocket } from '@/lib/socket';
@@ -91,6 +96,12 @@ export default function DeliveryDashboard() {
   useEffect(() => {
     setHydrated(useAuth.persist.hasHydrated());
     return useAuth.persist.onFinishHydration(() => setHydrated(true));
+  }, []);
+
+  // Prime the audio + install autoplay-unlock listener so job:assigned chimes
+  // even when the page has been idle in the background.
+  useEffect(() => {
+    initNotificationSound();
   }, []);
 
   useEffect(() => {
@@ -260,6 +271,7 @@ function DeliveryDashboardInner({ profile, setProfile, userName, onLogout }: Inn
       loadTransportJobs();
     }
     function onJobAssigned(payload: { kind?: 'transport' }) {
+      playDeliveryJob();
       if (payload?.kind === 'transport') loadMyTransportJobs();
       else loadMyJobs();
     }
@@ -354,6 +366,11 @@ function DeliveryDashboardInner({ profile, setProfile, userName, onLogout }: Inn
       </header>
 
       <main className="flex-1 container py-5 space-y-5">
+        <PushSetup
+          headline="Get alerts for new jobs"
+          subline="Even when the app is closed or your phone is locked. Don\u2019t miss a delivery."
+        />
+
         <div className="grid grid-cols-3 gap-3">
           <Link href="/delivery/wallet" className="block">
             <StatCard icon={Wallet} label="Wallet →" value={`₹${profile.walletBalance}`} />
