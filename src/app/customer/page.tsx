@@ -17,6 +17,8 @@ import {
   type CategoryNode,
 } from '@/lib/shops';
 import { DeliveryLocationBar } from '@/components/customer/DeliveryLocationBar';
+import { ServiceShopsList } from '@/components/customer/ServiceShopsList';
+import { ServiceCategoryPicker } from '@/components/customer/ServiceCategoryPicker';
 import { useDeliveryLocation } from '@/stores/deliveryLocation';
 import { useCart } from '@/stores/cart';
 import {
@@ -80,6 +82,21 @@ function isClothingGroup(node: CategoryNode | null | undefined): boolean {
   return n.includes('clothing') || n.includes('fashion');
 }
 
+/**
+ * Is this top-level group the Services one?
+ *
+ * Same name-match approach as isClothingGroup (backend _ids are dynamic).
+ * Services shops don't sell SKU products, so when this group is active we
+ * swap the product grid for a Google-"near me"-style service shop list.
+ */
+function isServicesGroup(node: CategoryNode | null | undefined): boolean {
+  if (!node) return false;
+  return node.name.toLowerCase().includes('service');
+}
+
+/** Radius (km) used when browsing services — wider than the default 5 km. */
+const SERVICE_RADIUS_KM = 25;
+
 function applySort<T extends { product: Product }>(items: T[], sortBy: SortKey): T[] {
   if (sortBy === 'relevance') return items;
   const copy = [...items];
@@ -121,6 +138,7 @@ export default function CustomerHome() {
     ? tree.find((g) => g._id === activeGroup) || null
     : null;
   const clothingMode = isClothingGroup(activeGroupNode);
+  const serviceMode = isServicesGroup(activeGroupNode);
 
   /* ---------- First-load silent GPS + reverse-geocode ---------- */
   useEffect(() => {
@@ -179,14 +197,14 @@ export default function CustomerHome() {
     fetchNearbyShops({
       lng: lng ?? undefined,
       lat: lat ?? undefined,
-      radiusKm: 5,
+      radiusKm: serviceMode ? SERVICE_RADIUS_KM : 5,
       category: activeCategory || undefined,
       q: query || undefined,
     })
       .then((r) => setShops(r.shops))
       .catch((e) => setError(e.message || 'Could not load shops'))
       .finally(() => setLoading(false));
-  }, [lat, lng, activeCategory, query]);
+  }, [lat, lng, activeCategory, query, serviceMode]);
 
   /* ---------- Reset filters when group changes ---------- */
   useEffect(() => {
@@ -214,6 +232,10 @@ export default function CustomerHome() {
 
   /* ---------- All Products feed ---------- */
   useEffect(() => {
+    if (serviceMode) {
+      setProductsByShop(new Map());
+      return;
+    }
     const ids = shopsWithDistance.slice(0, MAX_SHOPS_FOR_PRODUCTS).map((x) => x.shop._id);
     if (ids.length === 0) {
       setProductsByShop(new Map());
@@ -223,7 +245,7 @@ export default function CustomerHome() {
     fetchProductsForShops(ids)
       .then(setProductsByShop)
       .finally(() => setProductsLoading(false));
-  }, [shopsWithDistance]);
+  }, [shopsWithDistance, serviceMode]);
 
   /* ---------- Flattened, filtered, sorted product list ---------- */
   const allProducts = useMemo(() => {
@@ -380,7 +402,27 @@ export default function CustomerHome() {
       {/* ============================================================ */}
       {/* CLOTHING & FASHION MODE — sidebar layout                      */}
       {/* ============================================================ */}
-      {clothingMode && activeGroupNode ? (
+      {/* ============================================================ */}
+      {/* SERVICES MODE — Google "near me" list, no product grid        */}
+      {/* ============================================================ */}
+      {serviceMode && activeGroupNode ? (
+        activeCategory ? (
+          <ServiceShopsList
+            loading={loading}
+            shopsWithDistance={shopsWithDistance}
+            maxKm={SERVICE_RADIUS_KM}
+            categoryName={
+              activeGroupNode.children.find((c) => c._id === activeCategory)?.name
+            }
+            onBack={() => setActiveCategory(null)}
+          />
+        ) : (
+          <ServiceCategoryPicker
+            categories={activeGroupNode.children}
+            onPick={(id) => setActiveCategory(id)}
+          />
+        )
+      ) : clothingMode && activeGroupNode ? (
         <div className="flex gap-5">
           <ClothingFiltersSidebar
             filters={filters}
