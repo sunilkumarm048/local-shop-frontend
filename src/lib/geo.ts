@@ -15,3 +15,17 @@ export function getCurrentPosition(timeoutMs = 8000): Promise<GeolocationCoordin
     );
   });
 }
+
+/**
+ * Human-friendly distance label, Google-"near me" style.
+ *   0.45 km -> "450 m"
+ *   1.234 km -> "1.2 km"
+ * Sub-kilometre rounds to the nearest 10 m; otherwise one decimal of km.
+ */
+export function formatDistance(km: number): string {
+  if (km < 1) {
+    const m = Math.round((km * 1000) / 10) * 10;
+    return `${m} m`;
+  }
+  return `${km.toFixed(1)} km`;
+}
