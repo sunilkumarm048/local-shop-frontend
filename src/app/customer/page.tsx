@@ -97,6 +97,46 @@ function isServicesGroup(node: CategoryNode | null | undefined): boolean {
 /** Radius (km) used when browsing services — wider than the default 5 km. */
 const SERVICE_RADIUS_KM = 25;
 
+/**
+ * Distance slider for "Shops near you" — lets the customer widen or narrow
+ * how far the search reaches (1–25 km). Mirrors the delivery page's control.
+ * Only meaningful once we have the customer's location; otherwise it's hidden
+ * because distance filtering needs coordinates.
+ */
+function RadiusSlider({
+  radiusKm,
+  setRadiusKm,
+  hasLocation,
+}: {
+  radiusKm: number;
+  setRadiusKm: (v: number) => void;
+  hasLocation: boolean;
+}) {
+  if (!hasLocation) return null;
+  return (
+    <div className="rounded-xl border border-border bg-card p-3 space-y-1.5">
+      <div className="flex items-center justify-between text-sm">
+        <span className="font-medium">Search radius</span>
+        <span className="text-muted-foreground">{radiusKm} km</span>
+      </div>
+      <input
+        type="range"
+        min={1}
+        max={25}
+        step={1}
+        value={radiusKm}
+        onChange={(e) => setRadiusKm(Number(e.target.value))}
+        className="w-full accent-brand-green"
+        aria-label="Search radius in kilometres"
+      />
+      <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+        <span>1 km</span>
+        <span>25 km</span>
+      </div>
+    </div>
+  );
+}
+
 function applySort<T extends { product: Product }>(items: T[], sortBy: SortKey): T[] {
   if (sortBy === 'relevance') return items;
   const copy = [...items];
@@ -116,6 +156,7 @@ export default function CustomerHome() {
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [selectedShopId, setSelectedShopId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
+  const [radiusKm, setRadiusKm] = useState(5);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -139,6 +180,13 @@ export default function CustomerHome() {
     : null;
   const clothingMode = isClothingGroup(activeGroupNode);
   const serviceMode = isServicesGroup(activeGroupNode);
+
+  // Services are sparser than grocery shops, so when the customer switches
+  // into the Services group, widen the default search radius. Leaving services
+  // resets it. The slider can still override either way.
+  useEffect(() => {
+    setRadiusKm(serviceMode ? SERVICE_RADIUS_KM : 5);
+  }, [serviceMode]);
 
   /* ---------- First-load silent GPS + reverse-geocode ---------- */
   useEffect(() => {
@@ -197,14 +245,14 @@ export default function CustomerHome() {
     fetchNearbyShops({
       lng: lng ?? undefined,
       lat: lat ?? undefined,
-      radiusKm: serviceMode ? SERVICE_RADIUS_KM : 5,
+      radiusKm,
       category: activeCategory || undefined,
       q: query || undefined,
     })
       .then((r) => setShops(r.shops))
       .catch((e) => setError(e.message || 'Could not load shops'))
       .finally(() => setLoading(false));
-  }, [lat, lng, activeCategory, query, serviceMode]);
+  }, [lat, lng, activeCategory, query, serviceMode, radiusKm]);
 
   /* ---------- Reset filters when group changes ---------- */
   useEffect(() => {
@@ -399,9 +447,16 @@ export default function CustomerHome() {
         </div>
       )}
 
-      {/* ============================================================ */}
-      {/* CLOTHING & FASHION MODE — sidebar layout                      */}
-      {/* ============================================================ */}
+      {/* Distance slider — shown wherever shops are listed by distance.
+          Hidden on the service category-picker step (no shops shown yet). */}
+      {!(serviceMode && activeGroupNode && !activeCategory) && (
+        <RadiusSlider
+          radiusKm={radiusKm}
+          setRadiusKm={setRadiusKm}
+          hasLocation={lat != null && lng != null}
+        />
+      )}
+
       {/* ============================================================ */}
       {/* SERVICES MODE — Google "near me" list, no product grid        */}
       {/* ============================================================ */}
@@ -410,7 +465,7 @@ export default function CustomerHome() {
           <ServiceShopsList
             loading={loading}
             shopsWithDistance={shopsWithDistance}
-            maxKm={SERVICE_RADIUS_KM}
+            maxKm={radiusKm}
             categoryName={
               activeGroupNode.children.find((c) => c._id === activeCategory)?.name
             }
@@ -741,4 +796,3 @@ function ProductsGrid({
     </section>
   );
 }
-              
