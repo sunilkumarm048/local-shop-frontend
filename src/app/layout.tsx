@@ -11,7 +11,13 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: 'Local Shop',
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL || 'https://local-shop-frontend.vercel.app'
+  ),
+  title: {
+    default: 'Local Shop — shops & services near you',
+    template: '%s · Local Shop',
+  },
   description:
     'Hyperlocal grocery + transport — order from shops nearby or book a vehicle to move anything.',
   manifest: '/manifest.json',
