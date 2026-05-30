@@ -109,3 +109,66 @@ async function cacheFirst(request) {
 self.addEventListener('message', (event) => {
   if (event.data === 'SKIP_WAITING') self.skipWaiting();
 });
+
+// ---------------------------------------------------------------------------
+// Web Push — show OS-level notifications even when the app is closed/locked.
+//
+// The backend (services/push.js) sends a JSON body of the shape:
+//   { title, body, tag, url, orderId }
+// We display it, and on click focus an existing tab (or open a new one) at
+// the notification's `url`.
+// ---------------------------------------------------------------------------
+
+self.addEventListener('push', (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    // Non-JSON payload — fall back to plain text body.
+    data = { title: 'Local Shop', body: event.data ? event.data.text() : '' };
+  }
+
+  const title = data.title || 'Local Shop';
+  const options = {
+    body: data.body || '',
+    tag: data.tag || undefined, // same tag replaces an existing notification
+    data: { url: data.url || '/', orderId: data.orderId },
+    icon: '/icons/icon-192.png',
+    badge: '/icons/icon-192.png',
+    renotify: Boolean(data.tag),
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const targetUrl = (event.notification.data && event.notification.data.url) || '/';
+
+  event.waitUntil(
+    (async () => {
+      const allClients = await self.clients.matchAll({
+        type: 'window',
+        includeUncontrolled: true,
+      });
+      // If a tab is already open, focus it and navigate there.
+      for (const client of allClients) {
+        if ('focus' in client) {
+          await client.focus();
+          if ('navigate' in client) {
+            try {
+              await client.navigate(targetUrl);
+            } catch {
+              /* cross-origin or not allowed — ignore, focus is enough */
+            }
+          }
+          return;
+        }
+      }
+      // Otherwise open a new window.
+      if (self.clients.openWindow) {
+        await self.clients.openWindow(targetUrl);
+      }
+    })()
+  );
+});
