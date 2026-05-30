@@ -11,6 +11,7 @@ export interface Shop {
   isOpen: boolean;
   rating: number;
   ratingCount: number;
+  gallery?: string[];
   address?: {
     line1?: string;
     city?: string;
