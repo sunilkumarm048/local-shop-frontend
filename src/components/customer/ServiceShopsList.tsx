@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { MapPin, Star, Clock, Phone, Navigation, Store } from 'lucide-react';
+import { MapPin, Star, Clock, Phone, Navigation, Store, ChevronLeft } from 'lucide-react';
 
 import { Card } from '@/components/ui/card';
 import { formatDistance } from '@/lib/geo';
@@ -12,6 +12,10 @@ interface ServiceShopsListProps {
   shopsWithDistance: Array<{ shop: Shop; km: number | null }>;
   /** Shops farther than this (km) are hidden in service mode. */
   maxKm?: number;
+  /** Name of the selected service category, shown in the header. */
+  categoryName?: string;
+  /** Called when the user taps "Back" to return to the category picker. */
+  onBack?: () => void;
 }
 
 /**
@@ -29,6 +33,8 @@ export function ServiceShopsList({
   loading,
   shopsWithDistance,
   maxKm = 25,
+  categoryName,
+  onBack,
 }: ServiceShopsListProps) {
   // Cap to the service radius. Shops with unknown distance (no GPS) are kept
   // so the list isn't empty when location permission was denied.
@@ -36,12 +42,30 @@ export function ServiceShopsList({
     ({ km }) => km == null || km <= maxKm
   );
 
+  const title = categoryName ? `${categoryName} near you` : 'Services near you';
+
+  const Header = ({ count }: { count?: number }) => (
+    <div className="flex items-center gap-2 px-1">
+      {onBack && (
+        <button
+          onClick={onBack}
+          aria-label="Back to all services"
+          className="shrink-0 -ml-1 p-1 rounded-md hover:bg-muted text-muted-foreground"
+        >
+          <ChevronLeft className="h-5 w-5" />
+        </button>
+      )}
+      <h2 className="text-base font-bold tracking-tight flex-1">{title}</h2>
+      {count != null && (
+        <span className="text-xs text-muted-foreground">{count} found</span>
+      )}
+    </div>
+  );
+
   if (loading) {
     return (
       <section className="space-y-3">
-        <h2 className="text-base font-bold tracking-tight px-1">
-          Services near you
-        </h2>
+        <Header />
         <div className="space-y-2.5">
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="h-28 rounded-xl bg-muted animate-pulse" />
@@ -54,13 +78,12 @@ export function ServiceShopsList({
   if (visible.length === 0) {
     return (
       <section className="space-y-3">
-        <h2 className="text-base font-bold tracking-tight px-1">
-          Services near you
-        </h2>
+        <Header />
         <div className="text-center py-12 text-sm text-muted-foreground">
-          📍 No services found within {maxKm} km.
+          📍 No {categoryName ? categoryName.toLowerCase() : 'services'} found
+          within {maxKm} km.
           <br />
-          Try a different category.
+          Try another service or change your location.
         </div>
       </section>
     );
@@ -68,12 +91,7 @@ export function ServiceShopsList({
 
   return (
     <section className="space-y-3">
-      <div className="flex items-center justify-between px-1">
-        <h2 className="text-base font-bold tracking-tight">Services near you</h2>
-        <span className="text-xs text-muted-foreground">
-          {visible.length} found
-        </span>
-      </div>
+      <Header count={visible.length} />
 
       <div className="space-y-2.5">
         {visible.map(({ shop, km }) => (
