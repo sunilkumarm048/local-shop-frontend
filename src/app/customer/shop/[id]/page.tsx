@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { fetchShop, fetchShopProducts, type Shop, type Product } from '@/lib/shops';
 import { useCart } from '@/stores/cart';
+import { ShopGallery } from '@/components/customer/ShopGallery';
+import { ReviewSection } from '@/components/customer/ReviewSection';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -83,6 +85,8 @@ export default function ShopDetailPage({ params }: PageProps) {
           </span>
         </div>
       </div>
+
+      <ShopGallery photos={shop.gallery || []} />
 
       {products.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
@@ -200,6 +204,12 @@ export default function ShopDetailPage({ params }: PageProps) {
           })}
         </div>
       )}
+
+      <ReviewSection
+        shopId={shop._id}
+        rating={shop.rating}
+        ratingCount={shop.ratingCount}
+      />
     </main>
   );
 }
