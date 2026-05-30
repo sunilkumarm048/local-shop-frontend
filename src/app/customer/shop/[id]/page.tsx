@@ -1,215 +1,134 @@
-'use client';
+import type { Metadata } from 'next';
 
-import { use, useEffect, useState } from 'react';
-import { Minus, Plus, ArrowLeft, ImageIcon, Zap } from 'lucide-react';
-import Link from 'next/link';
+import ShopDetailClient from './ShopDetailClient';
 
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { fetchShop, fetchShopProducts, type Shop, type Product } from '@/lib/shops';
-import { useCart } from '@/stores/cart';
-import { ShopGallery } from '@/components/customer/ShopGallery';
-import { ReviewSection } from '@/components/customer/ReviewSection';
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
 interface PageProps {
   params: Promise<{ id: string }>;
 }
 
-export default function ShopDetailPage({ params }: PageProps) {
-  const { id } = use(params);
+/**
+ * Server-side fetch of one shop, used only to build SEO metadata + JSON-LD.
+ * Kept separate from the client component's own fetch so a slow/failed call
+ * here never blocks the interactive page — we just fall back to generic tags.
+ */
+async function getShop(id: string) {
+  try {
+    const res = await fetch(`${API_URL}/shops/${id}`, {
+      // Re-fetch periodically so edited shop names/descriptions refresh in
+      // search engines without a redeploy.
+      next: { revalidate: 3600 },
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.shop || null;
+  } catch {
+    return null;
+  }
+}
 
-  const [shop, setShop] = useState<Shop | null>(null);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+/**
+ * Per-shop SEO metadata. This is what makes the page rank for and display as
+ * "<Shop> — <Category> in <City>" instead of the generic "Local Shop" title.
+ * Runs on the server, so Google's crawler sees it.
+ */
+export async function generateMetadata({
+  params,
+}: PageProps): Promise<Metadata> {
+  const { id } = await params;
+  const shop = await getShop(id);
 
-  const cart = useCart();
-
-  useEffect(() => {
-    setLoading(true);
-    Promise.all([fetchShop(id), fetchShopProducts(id)])
-      .then(([s, p]) => {
-        setShop(s.shop);
-        setProducts(p.products);
-      })
-      .catch((e) => setError(e.message || 'Could not load shop'))
-      .finally(() => setLoading(false));
-  }, [id]);
-
-  const cartItemsByProduct = Object.fromEntries(cart.items.map((i) => [i.productId, i]));
-
-  if (loading) {
-    return (
-      <main className="container py-6 space-y-4">
-        <div className="h-8 w-48 bg-muted rounded animate-pulse" />
-        <div className="grid sm:grid-cols-2 gap-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="h-24 rounded-xl bg-muted animate-pulse" />
-          ))}
-        </div>
-      </main>
-    );
+  if (!shop) {
+    return {
+      title: 'Shop — Local Shop',
+      description: 'Discover local shops and services near you on Local Shop.',
+    };
   }
 
-  if (error || !shop) {
-    return (
-      <main className="container py-12 text-center">
-        <p className="text-destructive">{error || 'Shop not found'}</p>
-        <Button asChild variant="link">
-          <Link href="/customer">Back to shops</Link>
-        </Button>
-      </main>
-    );
-  }
+  const city = shop.address?.city || '';
+  const area = shop.address?.line1 || '';
+  const locationBit = [area, city].filter(Boolean).join(', ');
+  const title = locationBit
+    ? `${shop.name} — ${locationBit}`
+    : shop.name;
+  const description =
+    shop.description ||
+    `${shop.name}${locationBit ? ` in ${locationBit}` : ''}. View details, photos, ratings and contact on Local Shop.`;
+
+  const image = shop.coverImage || shop.logo || undefined;
+
+  return {
+    title,
+    description,
+    alternates: { canonical: `/customer/shop/${id}` },
+    openGraph: {
+      title,
+      description,
+      type: 'website',
+      images: image ? [{ url: image }] : undefined,
+    },
+    twitter: {
+      card: image ? 'summary_large_image' : 'summary',
+      title,
+      description,
+      images: image ? [image] : undefined,
+    },
+  };
+}
+
+export default async function ShopDetailPage({ params }: PageProps) {
+  const { id } = await params;
+  const shop = await getShop(id);
+
+  // LocalBusiness structured data — helps Google show name, rating, address,
+  // and phone directly in results. Only emitted when we have real data.
+  const jsonLd = shop
+    ? {
+        '@context': 'https://schema.org',
+        '@type': 'LocalBusiness',
+        name: shop.name,
+        description: shop.description || undefined,
+        image: shop.coverImage || shop.logo || undefined,
+        telephone: shop.phone || undefined,
+        address: shop.address
+          ? {
+              '@type': 'PostalAddress',
+              streetAddress: shop.address.line1 || undefined,
+              addressLocality: shop.address.city || undefined,
+              postalCode: shop.address.pincode || undefined,
+              addressCountry: 'IN',
+            }
+          : undefined,
+        geo:
+          shop.location?.coordinates?.length === 2
+            ? {
+                '@type': 'GeoCoordinates',
+                latitude: shop.location.coordinates[1],
+                longitude: shop.location.coordinates[0],
+              }
+            : undefined,
+        aggregateRating:
+          shop.ratingCount > 0
+            ? {
+                '@type': 'AggregateRating',
+                ratingValue: shop.rating,
+                reviewCount: shop.ratingCount,
+              }
+            : undefined,
+      }
+    : null;
 
   return (
-    <main className="container py-6 space-y-6">
-      <Link
-        href="/customer"
-        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-      >
-        <ArrowLeft className="h-4 w-4" /> Back
-      </Link>
-
-      <div>
-        <h1 className="text-2xl font-bold">{shop.name}</h1>
-        {shop.description && (
-          <p className="text-sm text-muted-foreground mt-1">{shop.description}</p>
-        )}
-        <div className="text-xs text-muted-foreground mt-2">
-          {shop.address?.city}
-          {shop.address?.pincode && ` · ${shop.address.pincode}`}
-          {' · '}
-          <span className={shop.isOpen ? 'text-primary' : ''}>
-            {shop.isOpen ? 'Open now' : 'Closed'}
-          </span>
-        </div>
-      </div>
-
-      <ShopGallery photos={shop.gallery || []} />
-
-      {products.length === 0 ? (
-        <div className="text-center py-12 text-muted-foreground">
-          This shop has not listed any products yet.
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-          {products.map((p) => {
-            const inCart = cartItemsByProduct[p._id];
-            const isOut = !p.inStock || p.stock === 0;
-            const discountPct =
-              p.mrp && p.mrp > p.price
-                ? Math.round(((p.mrp - p.price) / p.mrp) * 100)
-                : 0;
-
-            return (
-              <Card key={p._id} className="overflow-hidden flex flex-col">
-                {/* Square product image — full card width, like Blinkit/Zepto */}
-                <div className="relative aspect-square bg-muted">
-                  {discountPct > 0 && (
-                    <div className="absolute top-0 left-2 z-10 bg-primary text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-b">
-                      {discountPct}% OFF
-                    </div>
-                  )}
-                  {p.image ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={p.image}
-                      alt={p.name}
-                      loading="lazy"
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <ImageIcon className="h-8 w-8 text-muted-foreground/40" />
-                    </div>
-                  )}
-                </div>
-
-                {/* Card body */}
-                <div className="p-2 flex-1 flex flex-col gap-1">
-                  {/* Delivery badge */}
-                  <div className="inline-flex items-center gap-1 text-[10px] font-semibold text-muted-foreground bg-muted px-1.5 py-0.5 rounded w-fit">
-                    <Zap className="h-2.5 w-2.5 fill-current" /> 15 MINS
-                  </div>
-
-                  {/* Name */}
-                  <div className="text-sm font-medium leading-tight line-clamp-2 min-h-[2.5rem]">
-                    {p.name}
-                  </div>
-
-                  {/* Weight */}
-                  <div className="text-xs text-muted-foreground">
-                    {p.weight || '1 unit'}
-                  </div>
-
-                  {/* Price + Add row, pinned to bottom */}
-                  <div className="flex items-center justify-between gap-2 mt-auto pt-1">
-                    <div className="flex flex-col leading-tight">
-                      <span className="font-semibold text-sm">₹{p.price}</span>
-                      {p.mrp && p.mrp > p.price && (
-                        <span className="text-[10px] text-muted-foreground line-through">
-                          ₹{p.mrp}
-                        </span>
-                      )}
-                    </div>
-
-                    {isOut ? (
-                      <span className="text-[10px] text-muted-foreground font-medium">
-                        Out
-                      </span>
-                    ) : inCart ? (
-                      <div className="flex items-center bg-primary text-primary-foreground rounded overflow-hidden">
-                        <button
-                          aria-label="Decrease quantity"
-                          className="w-7 h-7 flex items-center justify-center hover:bg-primary/85 transition"
-                          onClick={() => cart.setQty(p._id, inCart.qty - 1)}
-                        >
-                          <Minus className="h-3 w-3" />
-                        </button>
-                        <span className="text-xs font-bold w-5 text-center">
-                          {inCart.qty}
-                        </span>
-                        <button
-                          aria-label="Increase quantity"
-                          className="w-7 h-7 flex items-center justify-center hover:bg-primary/85 transition"
-                          onClick={() => cart.setQty(p._id, inCart.qty + 1)}
-                        >
-                          <Plus className="h-3 w-3" />
-                        </button>
-                      </div>
-                    ) : (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-7 px-3 text-xs font-bold tracking-wider border-primary text-primary hover:bg-primary/10 hover:text-primary"
-                        onClick={() =>
-                          cart.add({
-                            productId: p._id,
-                            shopId: shop._id,
-                            name: p.name,
-                            price: p.price,
-                            weight: p.weight,
-                            image: p.image,
-                          })
-                        }
-                      >
-                        ADD
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </Card>
-            );
-          })}
-        </div>
+    <>
+      {jsonLd && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
       )}
-
-      <ReviewSection
-        shopId={shop._id}
-        rating={shop.rating}
-        ratingCount={shop.ratingCount}
-      />
-    </main>
+      <ShopDetailClient id={id} />
+    </>
   );
 }
