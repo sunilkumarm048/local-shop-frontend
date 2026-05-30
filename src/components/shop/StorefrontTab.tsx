@@ -24,6 +24,7 @@ import { updateShop } from '@/lib/owner';
 import { ApiError } from '@/lib/api';
 import type { Shop } from '@/lib/shops';
 import { ImageUploader } from '@/components/uploads/ImageUploader';
+import { GalleryManager } from '@/components/shop/GalleryManager';
 
 const editSchema = z.object({
   name: z.string().trim().min(2).max(80),
@@ -103,6 +104,8 @@ export function StorefrontTab({ shop, onUpdated }: Props) {
           )}
         </CardContent>
       </Card>
+
+      <GalleryManager shop={shop} onUpdated={onUpdated} />
 
       <EditDialog
         open={isEditing}
