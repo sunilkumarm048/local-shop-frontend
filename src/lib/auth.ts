@@ -72,3 +72,38 @@ export async function logout() {
   }
   useAuth.getState().clear();
 }
+
+/**
+ * Set a new password for the logged-in user (used for the forced first-login
+ * change on admin-created accounts). On success, refresh the user so the
+ * mustChangePassword flag clears in the store.
+ */
+export async function changePassword(newPassword: string) {
+  const token = useAuth.getState().token;
+  await api('/auth/change-password', {
+    method: 'POST',
+    token,
+    body: { newPassword },
+  });
+  await refreshMe();
+}
+
+/** Request a password-reset code to be emailed. */
+export async function forgotPassword(email: string) {
+  return api<{ ok: boolean; message: string }>('/auth/forgot-password', {
+    method: 'POST',
+    body: { email },
+  });
+}
+
+/** Verify the emailed code and set a new password. */
+export async function resetPassword(input: {
+  email: string;
+  code: string;
+  newPassword: string;
+}) {
+  return api<{ ok: boolean; message: string }>('/auth/reset-password', {
+    method: 'POST',
+    body: input,
+  });
+}
