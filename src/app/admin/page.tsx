@@ -27,6 +27,7 @@ import { logout } from '@/lib/auth';
 
 import { AdminOverviewTab } from '@/components/admin/AdminOverviewTab';
 import { AdminShopsTab } from '@/components/admin/AdminShopsTab';
+import AdminQuickAddShopTab from '@/components/admin/AdminQuickAddShopTab';
 import { AdminUsersTab } from '@/components/admin/AdminUsersTab';
 import { AdminOrdersTab } from '@/components/admin/AdminOrdersTab';
 import { AdminCategoriesTab } from '@/components/admin/AdminCategoriesTab';
@@ -40,6 +41,7 @@ import AdminTemplatesTab from '@/components/admin/AdminTemplatesTab';
 type Section =
   | 'overview'
   | 'shops'
+  | 'quickadd'
   | 'users'
   | 'orders'
   | 'categories'
@@ -113,6 +115,7 @@ export default function AdminDashboard() {
             <AdminOverviewTab goToTab={(tab) => setSection(tab as Section)} />
           )}
           {section === 'shops' && <AdminShopsTab />}
+          {section === 'quickadd' && <AdminQuickAddShopTab />}
           {section === 'users' && <AdminUsersTab currentUserId={user.id} />}
           {section === 'orders' && <AdminOrdersTab />}
           {section === 'categories' && <AdminCategoriesTab />}
@@ -137,6 +140,7 @@ function SectionNav({ current, onChange }: NavProps) {
   const items: Array<{ id: Section; label: string; icon: typeof Store }> = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard },
     { id: 'shops', label: 'Shops', icon: Store },
+    { id: 'quickadd', label: 'Quick Add Shop', icon: PackagePlus },
     { id: 'users', label: 'Users', icon: Users },
     { id: 'orders', label: 'Orders', icon: ListOrdered },
     { id: 'categories', label: 'Categories', icon: Tags },
