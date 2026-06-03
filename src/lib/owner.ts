@@ -53,6 +53,34 @@ export async function createShop(payload: CreateShopPayload) {
   });
 }
 
+/**
+ * Admin/agent field-onboarding: create a shop on a shopkeeper's behalf.
+ * Goes live immediately. Returns the new shop + the placeholder owner id.
+ */
+export async function quickCreateShop(payload: {
+  name: string;
+  category: string;
+  phone: string;
+  ownerEmail: string;
+  ownerPassword: string;
+  description?: string;
+  logo?: string;
+  lat: number;
+  lng: number;
+  address?: { line1?: string; city?: string; pincode?: string };
+}) {
+  return api<{
+    shop: Shop;
+    ownerId: string;
+    ownerEmail: string;
+    reusedExistingAccount: boolean;
+  }>('/admin/shops/quick-create', {
+    method: 'POST',
+    body: payload,
+    token: token(),
+  });
+}
+
 export async function updateShop(id: string, payload: UpdateShopPayload) {
   return api<{ shop: Shop }>(`/shops/${id}`, {
     method: 'PATCH',
