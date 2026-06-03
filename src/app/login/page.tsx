@@ -44,6 +44,15 @@ export default function LoginPage() {
     else router.push('/customer');
   };
 
+  // After login: admin-created accounts must set their own password first.
+  const routeAfterLogin = (user: { roles: string[]; mustChangePassword?: boolean }) => {
+    if (user.mustChangePassword) {
+      router.push('/change-password');
+    } else {
+      routeAfterLogin(user);
+    }
+  };
+
   // ---- Email/password ----
 
   const emailForm = useForm<z.infer<typeof emailSchema>>({
@@ -55,7 +64,7 @@ export default function LoginPage() {
     setServerError(null);
     try {
       const { user } = await loginWithEmail(data.email, data.password);
-      redirectByRole(user.roles);
+      routeAfterLogin(user);
     } catch (err) {
       setServerError(err instanceof ApiError ? err.message : 'Login failed');
     }
@@ -88,7 +97,7 @@ export default function LoginPage() {
     setServerError(null);
     try {
       const { user } = await verifyOtp({ phone: pendingPhone, code: data.code });
-      redirectByRole(user.roles);
+      routeAfterLogin(user);
     } catch (err) {
       setServerError(err instanceof ApiError ? err.message : 'Verification failed');
     }
@@ -151,7 +160,15 @@ export default function LoginPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="password">Password</Label>
+                  <Link
+                    href="/forgot-password"
+                    className="text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    Forgot password?
+                  </Link>
+                </div>
                 <Input
                   id="password"
                   type="password"
