@@ -49,7 +49,7 @@ export default function LoginPage() {
     if (user.mustChangePassword) {
       router.push('/change-password');
     } else {
-      routeAfterLogin(user);
+      redirectByRole(user.roles);
     }
   };
 
