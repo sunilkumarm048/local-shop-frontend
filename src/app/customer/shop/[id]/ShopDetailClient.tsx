@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Minus, Plus, ArrowLeft, ImageIcon, Zap } from 'lucide-react';
+import { Minus, Plus, ArrowLeft, ImageIcon, Zap, Phone, Navigation } from 'lucide-react';
 import Link from 'next/link';
 
 import { Button } from '@/components/ui/button';
@@ -83,13 +83,43 @@ export default function ShopDetailClient({ id }: Props) {
             {shop.isOpen ? 'Open now' : 'Closed'}
           </span>
         </div>
+
+        {/* Call + Directions — useful for every shop, essential for service
+            shops (parlours, studios) that take bookings rather than orders. */}
+        <div className="flex gap-2.5 mt-3">
+          {shop.phone && (
+            <Button asChild variant="outline" className="flex-1">
+              <a href={`tel:${shop.phone}`}>
+                <Phone className="h-4 w-4 mr-1.5" /> Call
+              </a>
+            </Button>
+          )}
+          <Button asChild className="flex-1">
+            <a
+              href={
+                shop.location?.coordinates
+                  ? `https://www.google.com/maps/dir/?api=1&destination=${shop.location.coordinates[1]},${shop.location.coordinates[0]}`
+                  : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                      [shop.name, shop.address?.line1, shop.address?.city].filter(Boolean).join(' ')
+                    )}`
+              }
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <Navigation className="h-4 w-4 mr-1.5" /> Directions
+            </a>
+          </Button>
+        </div>
       </div>
 
       <ShopGallery photos={shop.gallery || []} />
 
       {products.length === 0 ? (
-        <div className="text-center py-12 text-muted-foreground">
-          This shop has not listed any products yet.
+        <div className="text-center py-12 text-muted-foreground text-sm">
+          This shop doesn&apos;t sell items online.
+          <br />
+          Use <span className="font-semibold text-foreground">Call</span> or{' '}
+          <span className="font-semibold text-foreground">Directions</span> above to reach them.
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
