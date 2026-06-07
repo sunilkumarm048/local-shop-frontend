@@ -8,6 +8,7 @@ import { Crosshair, Loader2, MapPin, Search, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { geoSearch } from '@/lib/geo';
 
 /**
  * Lightweight pin picker for transport pickup / drop selection.
@@ -87,15 +88,14 @@ export function TransportPinPicker({ role, value, onChange, initialCenter }: Pro
     setSearchError(null);
     setResults(null);
     try {
-      const url = `https://nominatim.openstreetmap.org/search?format=json&limit=5&q=${encodeURIComponent(
-        q
-      )}`;
-      const res = await fetch(url, {
-        headers: { 'Accept-Language': 'en' },
-      });
-      if (!res.ok) throw new Error('Search failed');
-      const data = (await res.json()) as NominatimResult[];
-      setResults(data);
+      // Backend geo proxy: Ola Maps (India/village data) with OSM fallback.
+      const found = await geoSearch(q);
+      const mapped: NominatimResult[] = found.map((g) => ({
+        lat: String(g.lat),
+        lon: String(g.lng),
+        display_name: g.address || g.name,
+      }));
+      setResults(mapped);
     } catch (err) {
       setSearchError(err instanceof Error ? err.message : 'Search failed');
     } finally {
