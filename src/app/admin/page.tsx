@@ -18,6 +18,7 @@ import {
   Package,
   ShieldCheck,
   PackagePlus,
+  QrCode,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -37,6 +38,7 @@ import AdminShopDiscountsTab from '@/components/admin/AdminShopDiscountsTab';
 import AdminManageProductsTab from '@/components/admin/AdminManageProductsTab';
 import AdminDocVerificationTab from '@/components/admin/AdminDocVerificationTab';
 import AdminTemplatesTab from '@/components/admin/AdminTemplatesTab';
+import AdminQrCodesTab from '@/components/admin/AdminQrCodesTab';
 
 type Section =
   | 'overview'
@@ -50,7 +52,8 @@ type Section =
   | 'discounts'
   | 'products'
   | 'verifications'
-  | 'templates';
+  | 'templates'
+  | 'qrcodes';
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -125,6 +128,7 @@ export default function AdminDashboard() {
           {section === 'products' && <AdminManageProductsTab />}
           {section === 'verifications' && <AdminDocVerificationTab />}
           {section === 'templates' && <AdminTemplatesTab />}
+          {section === 'qrcodes' && <AdminQrCodesTab />}
         </div>
       </main>
     </div>
@@ -150,6 +154,7 @@ function SectionNav({ current, onChange }: NavProps) {
     { id: 'withdrawals', label: 'Withdrawals', icon: Banknote },
     { id: 'verifications', label: 'Verifications', icon: ShieldCheck },
     { id: 'templates', label: 'Templates', icon: PackagePlus },
+    { id: 'qrcodes', label: 'QR Codes', icon: QrCode },
   ];
   return (
     <nav className="flex gap-1 border-b overflow-x-auto">
@@ -183,4 +188,3 @@ function FullPageLoader({ label }: { label: string }) {
     </div>
   );
 }
-  
