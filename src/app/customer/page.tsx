@@ -504,7 +504,6 @@ export default function CustomerHome() {
               loading={loading}
               shopsWithDistance={shopsWithDistance}
               selectedShopId={selectedShopId}
-              setSelectedShopId={setSelectedShopId}
             />
 
             {/* Products grid */}
@@ -527,7 +526,6 @@ export default function CustomerHome() {
             loading={loading}
             shopsWithDistance={shopsWithDistance}
             selectedShopId={selectedShopId}
-            setSelectedShopId={setSelectedShopId}
           />
           <ProductsGrid
             productsLoading={productsLoading}
@@ -551,14 +549,12 @@ interface ShopsStripProps {
   loading: boolean;
   shopsWithDistance: Array<{ shop: Shop; km: number | null }>;
   selectedShopId: string | null;
-  setSelectedShopId: (id: string | null) => void;
 }
 
 function ShopsStrip({
   loading,
   shopsWithDistance,
   selectedShopId,
-  setSelectedShopId,
 }: ShopsStripProps) {
   return (
     <section className="space-y-2">
@@ -584,10 +580,10 @@ function ShopsStrip({
           {shopsWithDistance.map(({ shop, km }) => {
             const isActive = selectedShopId === shop._id;
             return (
-              <button
+              <Link
                 key={shop._id}
-                onClick={() => setSelectedShopId(isActive ? null : shop._id)}
-                className={`shrink-0 w-28 rounded-xl border p-2 text-center transition ${
+                href={`/customer/shop/${shop._id}`}
+                className={`shrink-0 w-28 rounded-xl border p-2 text-center transition block ${
                   isActive
                     ? 'border-primary bg-[#f0fbf2] shadow-[0_2px_8px_rgba(12,131,31,0.12)]'
                     : 'border-border bg-card hover:border-primary/50'
@@ -616,7 +612,7 @@ function ShopsStrip({
                     📏 {km.toFixed(1)} km
                   </div>
                 )}
-              </button>
+              </Link>
             );
           })}
         </div>
