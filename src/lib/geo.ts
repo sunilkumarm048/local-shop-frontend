@@ -3,7 +3,7 @@
  * Resolves to null on permission denied / unavailable rather than throwing,
  * so UIs can fall back to a manual location picker.
  */
-export function getCurrentPosition(timeoutMs = 8000): Promise<GeolocationCoordinates | null> {
+export function getCurrentPosition(timeoutMs = 15000): Promise<GeolocationCoordinates | null> {
   if (typeof navigator === 'undefined' || !navigator.geolocation) {
     return Promise.resolve(null);
   }
@@ -11,7 +11,7 @@ export function getCurrentPosition(timeoutMs = 8000): Promise<GeolocationCoordin
     navigator.geolocation.getCurrentPosition(
       (pos) => resolve(pos.coords),
       () => resolve(null),
-      { enableHighAccuracy: true, timeout: timeoutMs, maximumAge: 60_000 }
+      { enableHighAccuracy: true, timeout: timeoutMs, maximumAge: 0 }
     );
   });
 }
