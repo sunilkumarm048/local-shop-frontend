@@ -29,3 +29,47 @@ export function formatDistance(km: number): string {
   }
   return `${km.toFixed(1)} km`;
 }
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+
+export interface GeoResult {
+  name: string;
+  address: string;
+  lat: number;
+  lng: number;
+}
+
+/**
+ * Address search via our backend proxy (Ola Maps in India, OSM fallback).
+ * Returns [] on any error so callers can keep working.
+ */
+export async function geoSearch(query: string): Promise<GeoResult[]> {
+  const q = query.trim();
+  if (q.length < 3) return [];
+  try {
+    const res = await fetch(`${API_URL}/geo/search?q=${encodeURIComponent(q)}`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data.results) ? data.results : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Reverse geocode (coords → address) via our backend proxy. */
+export async function geoReverse(
+  lat: number,
+  lng: number
+): Promise<{ address: string; areaName: string }> {
+  try {
+    const res = await fetch(`${API_URL}/geo/reverse?lat=${lat}&lng=${lng}`);
+    if (!res.ok) throw new Error('reverse failed');
+    const data = await res.json();
+    return {
+      address: data.address || `${lat.toFixed(5)}, ${lng.toFixed(5)}`,
+      areaName: data.areaName || '',
+    };
+  } catch {
+    return { address: `${lat.toFixed(5)}, ${lng.toFixed(5)}`, areaName: '' };
+  }
+}
