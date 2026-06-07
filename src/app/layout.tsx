@@ -21,6 +21,9 @@ export const metadata: Metadata = {
   description:
     'Hyperlocal grocery + transport — order from shops nearby or book a vehicle to move anything.',
   manifest: '/manifest.json',
+  verification: {
+    google: 'sfZjDyNTptzTiJq1iVSs7_2d9DiQIsAxVaxo_vYSc48',
+  },
   appleWebApp: {
     capable: true,
     title: 'Local Shop',
