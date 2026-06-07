@@ -8,6 +8,7 @@ import { Loader2, MapPin, Search, X, Gift, RefreshCw } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { useDeliveryLocation, type DeliveryMode } from '@/stores/deliveryLocation';
+import { geoSearch, geoReverse } from '@/lib/geo';
 
 /* -----------------------------------------------------------------------
  * Leaflet default-icon shim (bundlers can't resolve the marker PNGs).
@@ -77,20 +78,12 @@ async function reverseGeocode(
   lat: number,
   lng: number
 ): Promise<{ areaName: string; address: string }> {
-  try {
-    const res = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&zoom=18&addressdetails=1`,
-      { headers: { 'Accept-Language': 'en' } }
-    );
-    if (!res.ok) return { areaName: '', address: '' };
-    const data = (await res.json()) as NominatimResult;
-    return {
-      areaName: shortLabel(data) || 'Selected location',
-      address: data.display_name || `${lat.toFixed(4)}, ${lng.toFixed(4)}`,
-    };
-  } catch {
-    return { areaName: '', address: '' };
-  }
+  // Goes through our backend proxy (Ola Maps in India, OSM fallback).
+  const { address, areaName } = await geoReverse(lat, lng);
+  return {
+    areaName: areaName || 'Selected location',
+    address: address || `${lat.toFixed(4)}, ${lng.toFixed(4)}`,
+  };
 }
 
 /* ---------- Map subcomponents ---------- */
@@ -194,14 +187,16 @@ export function DeliveryLocationModal({ open, onClose }: Props) {
     debounceRef.current = setTimeout(async () => {
       setSearching(true);
       try {
-        const res = await fetch(
-          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
-            trimmed
-          )}&format=json&limit=6&countrycodes=in&addressdetails=1`,
-          { headers: { 'Accept-Language': 'en' } }
-        );
-        const data = (await res.json()) as NominatimResult[];
-        setResults(data || []);
+        // Goes through our backend proxy: Ola Maps (good India/village data)
+        // with OSM fallback. Map the proxy's {name,address,lat,lng} shape into
+        // the NominatimResult shape this component already renders.
+        const found = await geoSearch(trimmed);
+        const mapped: NominatimResult[] = found.map((g) => ({
+          lat: String(g.lat),
+          lon: String(g.lng),
+          display_name: g.address || g.name,
+        }));
+        setResults(mapped);
         setShowResults(true);
       } catch {
         setResults([]);
