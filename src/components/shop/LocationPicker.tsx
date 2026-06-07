@@ -9,6 +9,7 @@ import { Crosshair, Loader2, MapPin, Search, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { geoSearch } from '@/lib/geo';
 
 /**
  * Leaflet ships its marker icons as separate files. Bundlers don't resolve them
@@ -184,14 +185,14 @@ export default function LocationPicker({ value, onChange, defaultCenter }: Props
     debounceRef.current = setTimeout(async () => {
       setSearching(true);
       try {
-        const res = await fetch(
-          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
-            trimmed
-          )}&format=json&limit=6&countrycodes=in&addressdetails=1`,
-          { headers: { 'Accept-Language': 'en' } }
-        );
-        const data = (await res.json()) as NominatimResult[];
-        setResults(data || []);
+        // Backend geo proxy: Ola Maps (India/village data) with OSM fallback.
+        const found = await geoSearch(trimmed);
+        const mapped: NominatimResult[] = found.map((g) => ({
+          lat: String(g.lat),
+          lon: String(g.lng),
+          display_name: g.address || g.name,
+        }));
+        setResults(mapped);
         setShowResults(true);
       } catch {
         setResults([]);
