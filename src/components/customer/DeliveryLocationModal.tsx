@@ -246,7 +246,7 @@ export function DeliveryLocationModal({ open, onClose }: Props) {
             : 'Could not get GPS. Tap Retry.'
         );
       },
-      { enableHighAccuracy: true, timeout: 10_000, maximumAge: 60_000 }
+      { enableHighAccuracy: true, timeout: 15_000, maximumAge: 0 }
     );
   }
 
