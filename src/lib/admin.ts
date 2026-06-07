@@ -362,3 +362,43 @@ export async function setDeliveryPartnerVerified(userId: string, verified: boole
     { method: 'PATCH', body: { verified }, token: token() }
   );
 }
+
+/* ============================================================
+ * QR flyer codes
+ * ============================================================ */
+
+export interface QrCodeRow {
+  code: string;
+  shopId: string | null;
+  shopName: string | null;
+  scans: number;
+  note: string;
+}
+
+export async function fetchQrCodes(status: 'all' | 'linked' | 'blank' = 'all') {
+  return api<{ total: number; linked: number; blank: number; codes: QrCodeRow[] }>(
+    `/qr/admin/list?status=${status}`,
+    { token: token() }
+  );
+}
+
+export async function generateQrCodes(count: number) {
+  return api<{ created: number; from: string; to: string; codes: string[] }>(
+    `/qr/admin/generate`,
+    { method: 'POST', body: { count }, token: token() }
+  );
+}
+
+export async function linkQrCode(code: string, shopId: string, note?: string) {
+  return api<{ code: string; shopId: string; shopName: string }>(
+    `/qr/admin/${encodeURIComponent(code)}/link`,
+    { method: 'POST', body: { shopId, note }, token: token() }
+  );
+}
+
+export async function unlinkQrCode(code: string) {
+  return api<{ code: string; status: string }>(
+    `/qr/admin/${encodeURIComponent(code)}/unlink`,
+    { method: 'POST', token: token() }
+  );
+}
