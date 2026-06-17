@@ -35,14 +35,18 @@ export function AdminOrdersTab() {
   const [status, setStatus] = useState<string>('active');
   const [orders, setOrders] = useState<AdminOrder[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   const refresh = useCallback(async () => {
+    setRefreshing(true);
     try {
       const r = await fetchAdminOrders({ status });
       setOrders(r.orders);
       setLoadError(null);
     } catch (err) {
       setLoadError(err instanceof ApiError ? err.message : 'Could not load orders.');
+    } finally {
+      setRefreshing(false);
     }
   }, [status]);
 
@@ -71,8 +75,15 @@ export function AdminOrdersTab() {
               </option>
             ))}
           </select>
-          <Button variant="outline" size="sm" onClick={refresh}>
-            Refresh
+          <Button variant="outline" size="sm" onClick={refresh} disabled={refreshing}>
+            {refreshing ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Refreshing…
+              </>
+            ) : (
+              'Refresh'
+            )}
           </Button>
         </div>
       </div>
