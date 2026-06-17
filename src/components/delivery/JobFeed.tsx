@@ -17,6 +17,17 @@ interface Props {
 }
 
 export function JobFeed({ jobs, hasLocation, onRefresh, onAccepted }: Props) {
+  const [refreshing, setRefreshing] = useState(false);
+
+  async function handleRefresh() {
+    setRefreshing(true);
+    try {
+      await onRefresh();
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
   if (!hasLocation) {
     return (
       <Card>
@@ -46,8 +57,21 @@ export function JobFeed({ jobs, hasLocation, onRefresh, onAccepted }: Props) {
             Nothing ready for pickup within your radius right now. Widen the radius or check
             back in a bit.
           </p>
-          <Button variant="outline" size="sm" onClick={onRefresh} className="mt-1">
-            Refresh
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="mt-1"
+          >
+            {refreshing ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Refreshing…
+              </>
+            ) : (
+              'Refresh'
+            )}
           </Button>
         </CardContent>
       </Card>
