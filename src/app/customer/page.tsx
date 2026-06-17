@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Minus, Plus, Search, ShoppingCart, Zap, ImageIcon } from 'lucide-react';
+import { Minus, Plus, Search, ShoppingCart, Zap, ImageIcon, Star } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -657,6 +657,17 @@ function ShopsStrip({
                 <div className="text-[10px] text-muted-foreground truncate mt-0.5">
                   {shop.description || 'Local Shop'}
                 </div>
+                {shop.ratingCount > 0 ? (
+                  <div className="flex items-center justify-center gap-0.5 mt-1 text-[10px] font-semibold text-[#8a6500]">
+                    <Star className="h-3 w-3 fill-[#f5b301] text-[#f5b301]" />
+                    {shop.rating.toFixed(1)}
+                    <span className="text-muted-foreground font-normal">
+                      ({shop.ratingCount})
+                    </span>
+                  </div>
+                ) : (
+                  <div className="mt-1 text-[10px] text-muted-foreground">New</div>
+                )}
                 {km != null && (
                   <div className="inline-block mt-1.5 text-[9px] font-extrabold tracking-wide text-[#1857c1] bg-[#dbe9ff] px-1.5 py-0.5 rounded">
                     📏 {km.toFixed(1)} km
