@@ -131,50 +131,80 @@ function OrderRow({ order }: { order: AdminOrder }) {
           </div>
         </div>
 
-        <div className="grid sm:grid-cols-3 gap-2 text-xs text-muted-foreground">
+        <div className="grid sm:grid-cols-3 gap-x-3 gap-y-2 text-xs text-muted-foreground">
+          {/* Shop */}
           {order.shop && (
-            <div className="flex items-center gap-1">
-              <Store className="h-3 w-3 shrink-0" />
-              <span className="truncate">{order.shop.name}</span>
+            <div className="space-y-0.5 min-w-0">
+              <div className="flex items-center gap-1 text-foreground/80 font-medium">
+                <Store className="h-3 w-3 shrink-0" />
+                <span className="truncate">{order.shop.name}</span>
+              </div>
             </div>
           )}
-          {order.customer && (
-            <div className="flex items-center gap-1">
-              <User className="h-3 w-3 shrink-0" />
-              <span className="truncate">
-                {order.customer.name || order.customer.email || 'Customer'}
-              </span>
+
+          {/* Customer + delivery address */}
+          {(order.customer || order.recipient) && (
+            <div className="space-y-0.5 min-w-0">
+              <div className="flex items-center gap-1 text-foreground/80 font-medium">
+                <User className="h-3 w-3 shrink-0" />
+                <span className="truncate">
+                  {order.recipient?.name ||
+                    order.customer?.name ||
+                    order.customer?.email ||
+                    'Customer'}
+                </span>
+              </div>
+              {(order.recipient?.phone || order.customer?.phone) && (
+                <a
+                  href={`tel:${order.recipient?.phone || order.customer?.phone}`}
+                  className="flex items-center gap-1 hover:text-foreground"
+                >
+                  <Phone className="h-3 w-3 shrink-0" />
+                  <span className="truncate">
+                    {order.recipient?.phone || order.customer?.phone}
+                  </span>
+                </a>
+              )}
+              {order.recipient?.address && (
+                <div className="flex items-start gap-1">
+                  <MapPin className="h-3 w-3 mt-0.5 shrink-0" />
+                  <span className="line-clamp-2">{order.recipient.address}</span>
+                </div>
+              )}
             </div>
           )}
+
+          {/* Delivery partner + phone + time */}
           {order.deliveryPartner ? (
-            <div className="flex items-center gap-1">
-              <Truck className="h-3 w-3 shrink-0" />
-              <span className="truncate">{order.deliveryPartner.name || 'Partner'}</span>
+            <div className="space-y-0.5 min-w-0">
+              <div className="flex items-center gap-1 text-foreground/80 font-medium">
+                <Truck className="h-3 w-3 shrink-0" />
+                <span className="truncate">{order.deliveryPartner.name || 'Partner'}</span>
+              </div>
+              {order.deliveryPartner.phone && (
+                <a
+                  href={`tel:${order.deliveryPartner.phone}`}
+                  className="flex items-center gap-1 hover:text-foreground"
+                >
+                  <Phone className="h-3 w-3 shrink-0" />
+                  <span className="truncate">{order.deliveryPartner.phone}</span>
+                </a>
+              )}
+              <div className="text-[10px] text-muted-foreground/80">
+                {order.status === 'delivered' ? 'Delivered' : 'Assigned'}:{' '}
+                {new Date(order.updatedAt).toLocaleString()}
+              </div>
             </div>
           ) : (
-            <div className="text-muted-foreground/60 italic">No partner yet</div>
+            <div className="flex items-center gap-1 text-muted-foreground/60 italic">
+              <Truck className="h-3 w-3 shrink-0" />
+              No partner yet
+            </div>
           )}
         </div>
 
-        {order.recipient && (
-          <div className="text-xs text-muted-foreground flex items-start gap-2">
-            {order.recipient.phone && (
-              <span className="flex items-center gap-1">
-                <Phone className="h-3 w-3" />
-                {order.recipient.phone}
-              </span>
-            )}
-            {order.recipient.address && (
-              <span className="flex items-start gap-1">
-                <MapPin className="h-3 w-3 mt-0.5 shrink-0" />
-                <span className="truncate max-w-md">{order.recipient.address}</span>
-              </span>
-            )}
-          </div>
-        )}
-
         <div className="text-[10px] text-muted-foreground">
-          {new Date(order.createdAt).toLocaleString()}
+          Ordered: {new Date(order.createdAt).toLocaleString()}
         </div>
       </CardContent>
     </Card>
