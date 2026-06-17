@@ -61,7 +61,13 @@ export interface AdminOrder {
   total: number;
   subtotal: number;
   deliveryFee?: number;
-  shop?: { _id: string; name: string; logo?: string };
+  shop?: {
+    _id: string;
+    name: string;
+    logo?: string;
+    phone?: string;
+    address?: { line1?: string; line2?: string; city?: string; state?: string; pincode?: string };
+  };
   customer?: { _id: string; name?: string; email?: string; phone?: string };
   deliveryPartner?: { _id: string; name?: string; phone?: string };
   items: Array<{ name: string; qty: number; price: number }>;
