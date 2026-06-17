@@ -78,6 +78,22 @@ export async function fetchNearbyShops(params: {
   return api<{ shops: Shop[] }>(`/shops${qs ? `?${qs}` : ''}`);
 }
 
+/**
+ * Ask the backend to AI-correct a raw search query (typos, half-words).
+ * Always resolves to something usable — falls back to the raw query.
+ */
+export async function normalizeSearch(q: string) {
+  const original = q.trim();
+  if (!original) return { original: '', query: '', corrected: false };
+  try {
+    return await api<{ original: string; query: string; corrected: boolean }>(
+      `/search/normalize?q=${encodeURIComponent(original)}`
+    );
+  } catch {
+    return { original, query: original, corrected: false };
+  }
+}
+
 export async function fetchCategories() {
   return api<{ categories: Category[] }>('/shops/categories');
 }
