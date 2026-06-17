@@ -12,6 +12,7 @@ import {
   ChefHat,
   PackageCheck,
   Scissors,
+  Bike,
   Bell,
   BellOff,
 } from 'lucide-react';
@@ -540,6 +541,40 @@ function OrderActions({ order, busy, runAction }: ActionsProps) {
   }
 
   if (order.status === 'ready_for_pickup') {
+    const partner = order.deliveryPartner;
+    if (partner) {
+      const vehicleLabels: Record<string, string> = {
+        bike: 'Bike',
+        '3wheeler': '3-Wheeler',
+        tataAce: 'Tata Ace',
+        pickup8ft: 'Pickup (8ft)',
+        tata407: 'Tata 407',
+      };
+      const vehicle = [
+        partner.vehicleType ? vehicleLabels[partner.vehicleType] || partner.vehicleType : null,
+        partner.vehicleNumber,
+      ]
+        .filter(Boolean)
+        .join(' · ');
+      return (
+        <div className="rounded-md bg-brand-greenLight/40 px-3 py-2 text-xs">
+          <div className="flex items-center gap-1.5 font-medium text-foreground/80">
+            <Bike className="h-3.5 w-3.5 shrink-0" />
+            <span>{partner.name || 'Delivery partner'} is coming to collect</span>
+          </div>
+          {vehicle && <div className="mt-0.5 text-muted-foreground">{vehicle}</div>}
+          {partner.phone && (
+            <a
+              href={`tel:${partner.phone}`}
+              className="mt-0.5 flex items-center gap-1.5 text-muted-foreground hover:text-foreground"
+            >
+              <Phone className="h-3.5 w-3.5 shrink-0" />
+              {partner.phone}
+            </a>
+          )}
+        </div>
+      );
+    }
     return (
       <div className="text-xs text-center text-muted-foreground bg-brand-greenLight/40 rounded-md py-2">
         Waiting for a delivery partner to pick this up.
