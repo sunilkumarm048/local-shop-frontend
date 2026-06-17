@@ -33,6 +33,7 @@ import {
   playDeliveryJob,
 } from '@/lib/notificationSound';
 import { PushSetup } from '@/components/notifications/PushSetup';
+import { SupportCard } from '@/components/support/SupportCard';
 import { useUser } from '@/hooks/useUser';
 import { logout } from '@/lib/auth';
 import { getSocket } from '@/lib/socket';
@@ -478,6 +479,8 @@ function DeliveryDashboardInner({ profile, setProfile, userName, onLogout }: Inn
             )}
           </section>
         )}
+
+        <SupportCard compact className="pt-1" />
       </main>
     </div>
   );
