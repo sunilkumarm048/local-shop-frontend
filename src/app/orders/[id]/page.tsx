@@ -3,7 +3,7 @@
 import dynamic from 'next/dynamic';
 import { use, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { CheckCircle2, Clock, Package, Truck, PackageCheck, Bike } from 'lucide-react';
+import { CheckCircle2, Clock, Package, Truck, PackageCheck, Bike, Phone } from 'lucide-react';
 
 import { Header } from '@/components/layout/header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -28,17 +28,31 @@ const DeliveryMap = dynamic(() => import('@/components/delivery/DeliveryMap'), {
   ),
 });
 
-// Full lifecycle as the customer sees it. ready_for_pickup is collapsed into
-// the "Preparing" step visually since from the customer's POV the order
-// becoming ready and the partner picking it up are nearly simultaneous.
-const STATUS_STEPS = [
+// Split the lifecycle into two phases the customer sees separately:
+// the shop preparing the order, then the delivery partner bringing it.
+const SHOP_STEPS = [
   { key: 'placed', label: 'Placed', icon: CheckCircle2 },
   { key: 'accepted', label: 'Accepted', icon: Clock },
   { key: 'preparing', label: 'Preparing', icon: Package },
+];
+
+const DELIVERY_STEPS = [
   { key: 'picked_up', label: 'Picked up', icon: PackageCheck },
   { key: 'out_for_delivery', label: 'On the way', icon: Truck },
   { key: 'delivered', label: 'Delivered', icon: CheckCircle2 },
 ];
+
+// Combined order used to compute how far the order has progressed overall.
+const STATUS_STEPS = [...SHOP_STEPS, ...DELIVERY_STEPS];
+
+// Human-readable vehicle labels for the partner card.
+const VEHICLE_LABELS: Record<string, string> = {
+  bike: 'Bike',
+  '3wheeler': '3-Wheeler',
+  tataAce: 'Tata Ace',
+  pickup8ft: 'Pickup (8ft)',
+  tata407: 'Tata 407',
+};
 
 // Statuses that fold into an earlier visible step (so the tracker doesn't jump
 // forward and back when the order transits through `ready_for_pickup`).
@@ -72,7 +86,13 @@ interface OrderShape {
     location?: { type: 'Point'; coordinates: [number, number] };
   };
   payment: { method: string; status: string };
-  deliveryPartner?: string;
+  deliveryPartner?: {
+    _id: string;
+    name?: string | null;
+    phone?: string | null;
+    vehicleType?: string | null;
+    vehicleNumber?: string | null;
+  } | null;
   createdAt: string;
   placedAt?: string;
   deliveredAt?: string;
@@ -205,7 +225,7 @@ export default function OrderDetailPage({ params }: PageProps) {
       <main className="container py-6 space-y-6 max-w-2xl">
         <PushSetup
           headline="Get order updates"
-          subline="Know the moment your order is accepted, on the way, and delivered \u2014 even with the app closed."
+          subline="Know the moment your order is accepted, on the way, and delivered — even with the app closed."
         />
 
         <div>
@@ -256,33 +276,112 @@ export default function OrderDetailPage({ params }: PageProps) {
             {isCancelled ? (
               <div className="text-destructive font-medium">Order {order.status}</div>
             ) : (
-              <ol className="space-y-3">
-                {STATUS_STEPS.map((step, i) => {
-                  const Icon = step.icon;
-                  const done = i <= statusIndex;
-                  const active = i === statusIndex;
-                  return (
-                    <li key={step.key} className="flex items-center gap-3">
-                      <div
-                        className={`h-8 w-8 rounded-full flex items-center justify-center ${
-                          done
-                            ? 'bg-primary text-primary-foreground'
-                            : 'bg-muted text-muted-foreground'
-                        }`}
-                      >
-                        <Icon className="h-4 w-4" />
+              <div className="space-y-5">
+                {/* Shop phase */}
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+                    Shop
+                  </p>
+                  <ol className="space-y-3">
+                    {SHOP_STEPS.map((step) => {
+                      const i = STATUS_STEPS.findIndex((s) => s.key === step.key);
+                      const Icon = step.icon;
+                      const done = i <= statusIndex;
+                      const active = i === statusIndex;
+                      return (
+                        <li key={step.key} className="flex items-center gap-3">
+                          <div
+                            className={`h-8 w-8 rounded-full flex items-center justify-center ${
+                              done
+                                ? 'bg-primary text-primary-foreground'
+                                : 'bg-muted text-muted-foreground'
+                            }`}
+                          >
+                            <Icon className="h-4 w-4" />
+                          </div>
+                          <span
+                            className={`text-sm ${
+                              active ? 'font-semibold' : done ? '' : 'text-muted-foreground'
+                            }`}
+                          >
+                            {step.label}
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ol>
+                </div>
+
+                {/* Delivery phase */}
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+                    Delivery
+                  </p>
+
+                  {/* Delivery partner card — shown once a partner is assigned */}
+                  {order.deliveryPartner && (
+                    <div className="mb-3 rounded-lg border bg-muted/40 p-3">
+                      <div className="flex items-center gap-2 text-sm font-medium">
+                        <Bike className="h-4 w-4 text-primary shrink-0" />
+                        <span>{order.deliveryPartner.name || 'Delivery partner'}</span>
                       </div>
-                      <span
-                        className={`text-sm ${
-                          active ? 'font-semibold' : done ? '' : 'text-muted-foreground'
-                        }`}
-                      >
-                        {step.label}
-                      </span>
-                    </li>
-                  );
-                })}
-              </ol>
+                      <div className="mt-1 space-y-0.5 text-xs text-muted-foreground">
+                        {(order.deliveryPartner.vehicleType ||
+                          order.deliveryPartner.vehicleNumber) && (
+                          <div>
+                            {[
+                              order.deliveryPartner.vehicleType
+                                ? VEHICLE_LABELS[order.deliveryPartner.vehicleType] ||
+                                  order.deliveryPartner.vehicleType
+                                : null,
+                              order.deliveryPartner.vehicleNumber,
+                            ]
+                              .filter(Boolean)
+                              .join(' · ')}
+                          </div>
+                        )}
+                      </div>
+                      {order.deliveryPartner.phone && (
+                        <a href={`tel:${order.deliveryPartner.phone}`} className="mt-2 inline-block">
+                          <Button size="sm" variant="outline">
+                            <Phone className="h-4 w-4 mr-2" />
+                            Call {order.deliveryPartner.phone}
+                          </Button>
+                        </a>
+                      )}
+                    </div>
+                  )}
+
+                  <ol className="space-y-3">
+                    {DELIVERY_STEPS.map((step) => {
+                      const i = STATUS_STEPS.findIndex((s) => s.key === step.key);
+                      const Icon = step.icon;
+                      const done = i <= statusIndex;
+                      const active = i === statusIndex;
+                      return (
+                        <li key={step.key} className="flex items-center gap-3">
+                          <div
+                            className={`h-8 w-8 rounded-full flex items-center justify-center ${
+                              done
+                                ? 'bg-primary text-primary-foreground'
+                                : 'bg-muted text-muted-foreground'
+                            }`}
+                          >
+                            <Icon className="h-4 w-4" />
+                          </div>
+                          <span
+                            className={`text-sm ${
+                              active ? 'font-semibold' : done ? '' : 'text-muted-foreground'
+                            }`}
+                          >
+                            {step.label}
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ol>
+                </div>
+              </div>
             )}
           </CardContent>
         </Card>
