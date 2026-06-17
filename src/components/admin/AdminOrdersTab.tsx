@@ -139,6 +139,31 @@ function OrderRow({ order }: { order: AdminOrder }) {
                 <Store className="h-3 w-3 shrink-0" />
                 <span className="truncate">{order.shop.name}</span>
               </div>
+              {order.shop.phone && (
+                <a
+                  href={`tel:${order.shop.phone}`}
+                  className="flex items-center gap-1 hover:text-foreground"
+                >
+                  <Phone className="h-3 w-3 shrink-0" />
+                  <span className="truncate">{order.shop.phone}</span>
+                </a>
+              )}
+              {order.shop.address && (
+                <div className="flex items-start gap-1">
+                  <MapPin className="h-3 w-3 mt-0.5 shrink-0" />
+                  <span className="line-clamp-2">
+                    {[
+                      order.shop.address.line1,
+                      order.shop.address.line2,
+                      order.shop.address.city,
+                      order.shop.address.state,
+                      order.shop.address.pincode,
+                    ]
+                      .filter(Boolean)
+                      .join(', ')}
+                  </span>
+                </div>
+              )}
             </div>
           )}
 
