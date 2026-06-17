@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Minus, Plus, Search, ShoppingCart, Zap, ImageIcon } from 'lucide-react';
 
@@ -12,6 +12,7 @@ import {
   fetchNearbyShops,
   fetchShopProducts,
   fetchCategoryTree,
+  normalizeSearch,
   type Shop,
   type Product,
   type CategoryNode,
@@ -156,6 +157,11 @@ export default function CustomerHome() {
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [selectedShopId, setSelectedShopId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
+  // `query` is what the user is typing; `searchTerm` is the committed search
+  // (set on Enter, after AI correction). Shops + products filter on searchTerm.
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchNote, setSearchNote] = useState<string | null>(null);
+  const [searching, setSearching] = useState(false);
   const [radiusKm, setRadiusKm] = useState(5);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -234,6 +240,29 @@ export default function CustomerHome() {
       .catch(() => {});
   }, []);
 
+  /* ---------- Commit a search (on Enter) ----------
+   *
+   * Sends the typed query to the backend AI normalizer, then commits the
+   * corrected term so the shop query + product filter run on it. An empty
+   * box clears the search.
+   */
+  const runSearch = useCallback(async () => {
+    const typed = query.trim();
+    if (!typed) {
+      setSearchTerm('');
+      setSearchNote(null);
+      return;
+    }
+    setSearching(true);
+    try {
+      const r = await normalizeSearch(typed);
+      setSearchTerm(r.query || typed);
+      setSearchNote(r.corrected ? `Showing results for "${r.query}"` : null);
+    } finally {
+      setSearching(false);
+    }
+  }, [query]);
+
   /* ---------- Shops query ----------
    *
    * Single category param works for every group now — even in clothing mode,
@@ -247,12 +276,12 @@ export default function CustomerHome() {
       lat: lat ?? undefined,
       radiusKm,
       category: activeCategory || undefined,
-      q: query || undefined,
+      q: searchTerm || undefined,
     })
       .then((r) => setShops(r.shops))
       .catch((e) => setError(e.message || 'Could not load shops'))
       .finally(() => setLoading(false));
-  }, [lat, lng, activeCategory, query, serviceMode, radiusKm]);
+  }, [lat, lng, activeCategory, searchTerm, serviceMode, radiusKm]);
 
   /* ---------- Reset filters when group changes ---------- */
   useEffect(() => {
@@ -305,8 +334,8 @@ export default function CustomerHome() {
     if (selectedShopId) {
       list = list.filter((x) => x.shop._id === selectedShopId);
     }
-    if (query.trim()) {
-      const needle = query.toLowerCase();
+    if (searchTerm.trim()) {
+      const needle = searchTerm.toLowerCase();
       list = list.filter((x) => x.product.name.toLowerCase().includes(needle));
     }
     if (clothingMode) {
@@ -341,7 +370,7 @@ export default function CustomerHome() {
     shopsWithDistance,
     productsByShop,
     selectedShopId,
-    query,
+    searchTerm,
     clothingMode,
     filters.priceMin,
     filters.priceMax,
@@ -359,15 +388,36 @@ export default function CustomerHome() {
     <main className="container py-5 space-y-5">
       <DeliveryLocationBar />
 
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search for atta, milk, snacks..."
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          className="pl-9"
-        />
+      {/* Search — shops + products, AI-corrected on Enter */}
+      <div className="space-y-1.5">
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search shops or products…"
+              value={query}
+              onChange={(e) => {
+                const v = e.target.value;
+                setQuery(v);
+                // Clearing the box immediately clears the active search.
+                if (v.trim() === '') {
+                  setSearchTerm('');
+                  setSearchNote(null);
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') runSearch();
+              }}
+              className="pl-9"
+            />
+          </div>
+          <Button onClick={runSearch} disabled={searching}>
+            {searching ? 'Searching…' : 'Search'}
+          </Button>
+        </div>
+        {searchNote && (
+          <p className="text-xs text-muted-foreground px-1">{searchNote}</p>
+        )}
       </div>
 
       {/* Top-level group strip */}
@@ -512,7 +562,7 @@ export default function CustomerHome() {
               allProducts={allProducts}
               selectedShop={selectedShop}
               setSelectedShopId={setSelectedShopId}
-              query={query}
+              query={searchTerm}
               showShopBadge
             />
           </div>
@@ -532,7 +582,7 @@ export default function CustomerHome() {
             allProducts={allProducts}
             selectedShop={selectedShop}
             setSelectedShopId={setSelectedShopId}
-            query={query}
+            query={searchTerm}
             showShopBadge={false}
           />
         </>
