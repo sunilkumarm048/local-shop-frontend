@@ -30,6 +30,7 @@ import {
   setShopSoundMuted,
 } from '@/lib/notificationSound';
 import { PushSetup } from '@/components/notifications/PushSetup';
+import { SupportCard } from '@/components/support/SupportCard';
 import {
   fetchShopOrders,
   fetchOrderSiblings,
@@ -263,6 +264,8 @@ export function OrdersTab({ shopId }: Props) {
           </button>
         ))}
       </div>
+
+      <SupportCard compact className="pt-1" />
 
       {/* List */}
       {orders === null ? (
