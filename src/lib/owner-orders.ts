@@ -55,6 +55,13 @@ export interface OwnerOrder {
   distanceKm?: number;
   recipient?: OrderRecipient;
   status: OrderStatus;
+  deliveryPartner?: {
+    _id: string;
+    name?: string | null;
+    phone?: string | null;
+    vehicleType?: string | null;
+    vehicleNumber?: string | null;
+  } | null;
   statusHistory?: Array<{ status: string; at: string; by?: string; note?: string }>;
   payment?: { method: 'razorpay' | 'cod'; status: string };
   isSplit?: boolean;
