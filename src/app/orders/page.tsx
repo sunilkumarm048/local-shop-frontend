@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Header } from '@/components/layout/header';
 import { Card, CardContent } from '@/components/ui/card';
+import { SupportCard } from '@/components/support/SupportCard';
 import { fetchMyOrders } from '@/lib/orders';
 
 interface OrderRow {
@@ -85,6 +86,10 @@ export default function MyOrdersPage() {
               </Card>
             </Link>
           ))
+        )}
+
+        {!loading && orders.length > 0 && (
+          <SupportCard compact className="pt-2" />
         )}
       </main>
     </>
