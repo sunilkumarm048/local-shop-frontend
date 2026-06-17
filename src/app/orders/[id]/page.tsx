@@ -16,6 +16,7 @@ import {
   playCustomerUpdate,
 } from '@/lib/notificationSound';
 import { PushSetup } from '@/components/notifications/PushSetup';
+import { SupportCard } from '@/components/support/SupportCard';
 
 // Leaflet on the map → dynamic with ssr:false. Reuses the delivery-side map
 // component (it doesn't care who's viewing it).
@@ -385,6 +386,11 @@ export default function OrderDetailPage({ params }: PageProps) {
             )}
           </CardContent>
         </Card>
+
+        {/* Support — available while the order is in progress */}
+        {!isCancelled && order.status !== 'delivered' && (
+          <SupportCard orderId={order._id} />
+        )}
 
         {/* Items */}
         <Card>
