@@ -756,7 +756,7 @@ function ProductsGrid({
                       {discountPct}% OFF
                     </div>
                   )}
-                  {p.image ? (
+                  {p.image && !p.image.includes('via.placeholder.com') ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={p.image}
