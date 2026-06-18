@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Loader2, Plus, Pencil, Trash2, PackageX } from 'lucide-react';
+import { Loader2, Plus, Pencil, Trash2, PackageX, ImageIcon } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -148,12 +148,20 @@ function ProductCard({ product, onEdit }: CardProps) {
         onClick={onEdit}
         className="text-left w-full hover:bg-accent/50 transition-colors"
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={product.image || 'https://via.placeholder.com/400x300?text=No+image'}
-          alt={product.name}
-          className="w-full h-40 object-cover bg-muted"
-        />
+        {/* Show the image only if it's a real one. Legacy products may have a
+            dead via.placeholder.com URL saved — treat those as "no image". */}
+        {product.image && !product.image.includes('via.placeholder.com') ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={product.image}
+            alt={product.name}
+            className="w-full h-40 object-cover bg-muted"
+          />
+        ) : (
+          <div className="w-full h-40 flex items-center justify-center bg-muted">
+            <ImageIcon className="h-8 w-8 text-muted-foreground/40" />
+          </div>
+        )}
         <CardContent className="space-y-2 pt-4">
           <div className="flex items-start justify-between gap-2">
             <h3 className="font-medium leading-tight">{product.name}</h3>
