@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Loader2, Plus, Pencil, Trash2, PackageX, ImageIcon } from 'lucide-react';
+import { Loader2, Plus, Pencil, Trash2, PackageX, ImageIcon, RefreshCw } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,6 +25,7 @@ import {
   deleteProduct,
   fetchAllProductsForOwner,
   updateProduct,
+  syncProductImages,
 } from '@/lib/owner';
 import { ApiError } from '@/lib/api';
 import type { Product } from '@/lib/shops';
@@ -51,6 +52,8 @@ export function ProductsTab({ shopId }: Props) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [editing, setEditing] = useState<Product | null>(null);
   const [isOpen, setIsOpen] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState<string | null>(null);
 
   async function refresh() {
     try {
@@ -58,6 +61,24 @@ export function ProductsTab({ shopId }: Props) {
       setProducts(r.products);
     } catch (err) {
       setLoadError(err instanceof ApiError ? err.message : 'Could not load products.');
+    }
+  }
+
+  async function handleSyncImages() {
+    setSyncing(true);
+    setSyncMsg(null);
+    try {
+      const r = await syncProductImages(shopId);
+      setSyncMsg(
+        r.updated > 0
+          ? `Updated ${r.updated} product image${r.updated === 1 ? '' : 's'} from the catalog.`
+          : 'No images to update — products already match the catalog.'
+      );
+      await refresh();
+    } catch (err) {
+      setSyncMsg(err instanceof ApiError ? err.message : 'Could not sync images.');
+    } finally {
+      setSyncing(false);
     }
   }
 
@@ -84,11 +105,27 @@ export function ProductsTab({ shopId }: Props) {
             {products ? `${products.length} total` : 'Loading…'}
           </p>
         </div>
-        <Button onClick={openCreate}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add product
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={handleSyncImages} disabled={syncing}>
+            {syncing ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4 mr-2" />
+            )}
+            Sync images
+          </Button>
+          <Button onClick={openCreate}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add product
+          </Button>
+        </div>
       </div>
+
+      {syncMsg && (
+        <div className="text-sm text-muted-foreground bg-muted rounded-md px-3 py-2">
+          {syncMsg}
+        </div>
+      )}
 
       {loadError && (
         <div className="text-sm text-destructive bg-destructive/10 rounded-md px-3 py-2">
