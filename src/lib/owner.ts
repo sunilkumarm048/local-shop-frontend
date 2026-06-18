@@ -139,3 +139,17 @@ export async function deleteProduct(shopId: string, productId: string) {
     token: token(),
   });
 }
+
+/**
+ * Backfill/overwrite product images from the catalog templates (matched by
+ * name). Returns how many products were updated.
+ */
+export async function syncProductImages(shopId: string) {
+  return api<{ updated: number; scanned: number }>(
+    `/shops/${shopId}/products/sync-images`,
+    {
+      method: 'POST',
+      token: token(),
+    }
+  );
+}
