@@ -189,10 +189,23 @@ export default function LocationPicker({ value, onChange, defaultCenter }: Props
 
     let best: GeolocationPosition | null = null;
     let committed = false;
+    let gotAny = false;
     const GOOD_ENOUGH_M = 20; // genuinely precise (true GPS) — commit & stop
     const SETTLE_AFTER_M = 50; // decent — keep refining a bit, then settle
-    const MAX_WAIT_MS = 35_000; // patient like a maps app (was 15s — too short)
+    const MAX_WAIT_MS = 35_000; // patient like a maps app
     let settleTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const consider = (pos: GeolocationPosition) => {
+      gotAny = true;
+      if (!best || pos.coords.accuracy < best.coords.accuracy) {
+        best = pos;
+        const ll = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setAccuracy(pos.coords.accuracy);
+        // Live-move the pin + circle as it tightens (like a maps app).
+        setGpsFix(ll);
+        pickAndReverseGeocode(ll);
+      }
+    };
 
     const finish = async () => {
       if (committed) return;
@@ -205,7 +218,7 @@ export default function LocationPicker({ value, onChange, defaultCenter }: Props
       }
       if (!best) {
         setGeoError(
-          'Could not get a GPS fix. Please search your area above or drag the pin to your shop.'
+          'Could not get your location. Please search your area above, or drag the pin onto your shop using the satellite view.'
         );
         setLocating(false);
         return;
@@ -229,42 +242,47 @@ export default function LocationPicker({ value, onChange, defaultCenter }: Props
 
     const stopTimer = setTimeout(finish, MAX_WAIT_MS);
 
+    // (1) Immediate fix — allow a recent cached/network reading so we ALWAYS
+    // get something fast and never falsely report "couldn't get location".
+    navigator.geolocation.getCurrentPosition(
+      (pos) => consider(pos),
+      () => {
+        /* ignore — the watch below is the real attempt */
+      },
+      { enableHighAccuracy: false, timeout: 10_000, maximumAge: 60_000 }
+    );
+
+    // (2) High-accuracy watch — refines the pin as true GPS locks on.
     watchRef.current = navigator.geolocation.watchPosition(
       (pos) => {
-        // Keep — and live-show — the most accurate reading so far.
-        if (!best || pos.coords.accuracy < best.coords.accuracy) {
-          best = pos;
-          const ll = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-          setAccuracy(pos.coords.accuracy);
-          // Live-move the pin + circle as it tightens (like a maps app).
-          setGpsFix(ll);
-          pickAndReverseGeocode(ll);
-        }
-
+        consider(pos);
         const acc = pos.coords.accuracy;
         if (acc <= GOOD_ENOUGH_M) {
-          // Truly precise — done.
-          finish();
+          finish(); // truly precise — done
         } else if (acc <= SETTLE_AFTER_M && !settleTimer) {
-          // Decent fix — give GPS ~6 more seconds to tighten, then settle.
+          // Decent fix — give GPS a few more seconds to tighten, then settle.
           settleTimer = setTimeout(finish, 6_000);
         }
       },
       (err) => {
-        clearTimeout(stopTimer);
-        if (settleTimer) clearTimeout(settleTimer);
-        if (watchRef.current != null) {
-          navigator.geolocation.clearWatch(watchRef.current);
-          watchRef.current = null;
+        // Only treat as a hard error if we never got ANY reading (incl. the
+        // instant getCurrentPosition above). Otherwise let the timer settle.
+        if (err.code === err.PERMISSION_DENIED) {
+          if (watchRef.current != null) {
+            navigator.geolocation.clearWatch(watchRef.current);
+            watchRef.current = null;
+          }
+          clearTimeout(stopTimer);
+          if (settleTimer) clearTimeout(settleTimer);
+          committed = true;
+          setGeoError(
+            'Location permission blocked. Allow location access in your browser settings, then try again — or drag the pin manually.'
+          );
+          setLocating(false);
+        } else if (!gotAny) {
+          // No GPS and no instant fix — let MAX_WAIT timer call finish(),
+          // which will show the friendly fallback message.
         }
-        const msg =
-          err.code === err.PERMISSION_DENIED
-            ? 'Location permission blocked. Allow location access in your browser settings, then try again — or drag the pin manually.'
-            : err.code === err.POSITION_UNAVAILABLE
-              ? 'Could not determine your location. Please search your area or drag the pin to your shop.'
-              : 'Finding your location took too long. Try again outdoors for a better GPS signal, or drag the pin to your shop.';
-        setGeoError(msg);
-        setLocating(false);
       },
       { enableHighAccuracy: true, timeout: MAX_WAIT_MS, maximumAge: 0 }
     );
