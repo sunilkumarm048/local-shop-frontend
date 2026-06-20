@@ -1,10 +1,10 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { MapContainer, Marker, TileLayer, useMap, useMapEvents } from 'react-leaflet';
+import { Circle, MapContainer, Marker, TileLayer, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Crosshair, Loader2, MapPin, Search, X } from 'lucide-react';
+import { Crosshair, Layers, Loader2, MapPin, Search, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -115,12 +115,29 @@ function Recenter({ target }: { target: LatLng | null }) {
   return null;
 }
 
+// When a GPS fix arrives, zoom in close so the user can actually orient
+// themselves (rural OSM tiles are blank when zoomed out).
+function FlyToFix({ fix }: { fix: LatLng | null }) {
+  const map = useMap();
+  useEffect(() => {
+    if (fix) map.setView([fix.lat, fix.lng], 17, { animate: true });
+  }, [fix, map]);
+  return null;
+}
+
 // ----- Main -----
 
 export default function LocationPicker({ value, onChange, defaultCenter }: Props) {
   const [locating, setLocating] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);
   const [geoIsNote, setGeoIsNote] = useState(false);
+  // Accuracy radius (metres) of the last GPS fix, for the uncertainty circle.
+  const [accuracy, setAccuracy] = useState<number | null>(null);
+  // Bumped each time a fresh GPS fix lands, to trigger a close zoom-in.
+  const [gpsFix, setGpsFix] = useState<LatLng | null>(null);
+  // Satellite vs map tiles — satellite helps rural users recognise their area.
+  const [satellite, setSatellite] = useState(true);
+  const watchRef = useRef<number | null>(null);
 
   // Search state
   const [query, setQuery] = useState('');
@@ -159,20 +176,43 @@ export default function LocationPicker({ value, onChange, defaultCenter }: Props
       setGeoError('Geolocation not supported by this browser.');
       return;
     }
+    // Cancel any in-flight watch.
+    if (watchRef.current != null) {
+      navigator.geolocation.clearWatch(watchRef.current);
+      watchRef.current = null;
+    }
+
     setLocating(true);
     setGeoError(null);
     setGeoIsNote(false);
+    setAccuracy(null);
 
-    const onSuccess = async (pos: GeolocationPosition) => {
-      await pickAndReverseGeocode({
-        lat: pos.coords.latitude,
-        lng: pos.coords.longitude,
-      });
-      // If the fix is rough (e.g. wifi/cell, not GPS), nudge the user to refine.
-      if (pos.coords.accuracy && pos.coords.accuracy > 100) {
+    let best: GeolocationPosition | null = null;
+    const GOOD_ENOUGH_M = 30; // stop early once we're this accurate
+    const MAX_WAIT_MS = 15_000; // otherwise commit the best we got
+
+    const commit = async () => {
+      if (watchRef.current != null) {
+        navigator.geolocation.clearWatch(watchRef.current);
+        watchRef.current = null;
+      }
+      if (!best) {
+        setGeoError(
+          'Could not get a GPS fix. Please search your area above or drag the pin to your shop.'
+        );
+        setLocating(false);
+        return;
+      }
+      const ll = { lat: best.coords.latitude, lng: best.coords.longitude };
+      const acc = best.coords.accuracy;
+      setAccuracy(acc);
+      setGpsFix(ll); // triggers close zoom-in
+      await pickAndReverseGeocode(ll);
+
+      if (acc > 75) {
         setGeoIsNote(true);
         setGeoError(
-          'Got an approximate location — please drag the pin to your exact shop.'
+          `Location is approximate (within ~${Math.round(acc)} m). Switch to Satellite and drag the pin onto your shop.`
         );
       } else {
         setGeoError(null);
@@ -180,37 +220,48 @@ export default function LocationPicker({ value, onChange, defaultCenter }: Props
       setLocating(false);
     };
 
-    const describe = (err: GeolocationPositionError) => {
-      if (err.code === err.PERMISSION_DENIED)
-        return 'Location permission blocked. Allow location access in your browser settings, then try again — or drag the pin manually.';
-      if (err.code === err.POSITION_UNAVAILABLE)
-        return 'Could not determine your location. Please drag the pin to your shop.';
-      return 'Finding your location took too long. Please drag the pin to your shop, or try again outdoors for a better GPS signal.';
-    };
+    const stopTimer = setTimeout(commit, MAX_WAIT_MS);
 
-    // Stage 2: quicker, lower-accuracy network fix as a fallback.
-    const tryLowAccuracy = () => {
-      navigator.geolocation.getCurrentPosition(onSuccess, (err) => {
-        setGeoError(describe(err));
-        setLocating(false);
-      }, { enableHighAccuracy: false, timeout: 15_000, maximumAge: 60_000 });
-    };
-
-    // Stage 1: high-accuracy GPS, longer timeout, allow a recent cached fix.
-    navigator.geolocation.getCurrentPosition(
-      onSuccess,
-      (err) => {
-        if (err.code === err.TIMEOUT || err.code === err.POSITION_UNAVAILABLE) {
-          // GPS lock failed — fall back to a fast network-based estimate.
-          tryLowAccuracy();
-        } else {
-          setGeoError(describe(err));
-          setLocating(false);
+    watchRef.current = navigator.geolocation.watchPosition(
+      (pos) => {
+        // Keep the most accurate reading seen so far.
+        if (!best || pos.coords.accuracy < best.coords.accuracy) {
+          best = pos;
+          setAccuracy(pos.coords.accuracy);
+        }
+        // Good enough? Commit immediately.
+        if (pos.coords.accuracy <= GOOD_ENOUGH_M) {
+          clearTimeout(stopTimer);
+          commit();
         }
       },
-      { enableHighAccuracy: true, timeout: 20_000, maximumAge: 30_000 }
+      (err) => {
+        clearTimeout(stopTimer);
+        if (watchRef.current != null) {
+          navigator.geolocation.clearWatch(watchRef.current);
+          watchRef.current = null;
+        }
+        const msg =
+          err.code === err.PERMISSION_DENIED
+            ? 'Location permission blocked. Allow location access in your browser settings, then try again — or drag the pin manually.'
+            : err.code === err.POSITION_UNAVAILABLE
+              ? 'Could not determine your location. Please search your area or drag the pin to your shop.'
+              : 'Finding your location took too long. Try again outdoors for a better GPS signal, or drag the pin to your shop.';
+        setGeoError(msg);
+        setLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: MAX_WAIT_MS, maximumAge: 0 }
     );
   }
+
+  // Clean up any active GPS watch on unmount.
+  useEffect(() => {
+    return () => {
+      if (watchRef.current != null) {
+        navigator.geolocation.clearWatch(watchRef.current);
+      }
+    };
+  }, []);
 
   // Forward search (Nominatim autocomplete, 350ms debounce, India-only)
   useEffect(() => {
@@ -348,19 +399,55 @@ export default function LocationPicker({ value, onChange, defaultCenter }: Props
       </div>
 
       {/* Map */}
-      <div className="h-72 w-full rounded-md overflow-hidden border">
+      <div className="relative h-72 w-full rounded-md overflow-hidden border">
+        {/* Map / Satellite toggle */}
+        <button
+          type="button"
+          onClick={() => setSatellite((s) => !s)}
+          className="absolute top-2 right-2 z-[1000] flex items-center gap-1 rounded-md bg-white/95 px-2 py-1 text-xs font-medium shadow border hover:bg-white"
+        >
+          <Layers className="h-3.5 w-3.5" />
+          {satellite ? 'Map' : 'Satellite'}
+        </button>
+
         <MapContainer
           center={[initial.lat, initial.lng]}
-          zoom={value ? 15 : 5}
+          zoom={value ? 16 : 5}
           scrollWheelZoom
           className="h-full w-full"
         >
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
+          {satellite ? (
+            <>
+              {/* Esri World Imagery — free satellite tiles, no API key. */}
+              <TileLayer
+                attribution='Tiles &copy; Esri'
+                url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                maxZoom={19}
+              />
+              {/* Road/place labels on top of satellite, so names are visible. */}
+              <TileLayer
+                attribution=""
+                url="https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"
+                maxZoom={19}
+              />
+            </>
+          ) : (
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
+          )}
           <ClickHandler onPick={pickAndReverseGeocode} />
           <Recenter target={value} />
+          <FlyToFix fix={gpsFix} />
+          {/* Accuracy circle — shows how uncertain the GPS fix is. */}
+          {value && accuracy != null && accuracy > 30 && (
+            <Circle
+              center={[value.lat, value.lng]}
+              radius={accuracy}
+              pathOptions={{ color: '#0C831F', fillColor: '#0C831F', fillOpacity: 0.12, weight: 1 }}
+            />
+          )}
           {value && (
             <Marker
               position={[value.lat, value.lng]}
@@ -369,6 +456,7 @@ export default function LocationPicker({ value, onChange, defaultCenter }: Props
               eventHandlers={{
                 dragend: (e) => {
                   const { lat, lng } = (e.target as L.Marker).getLatLng();
+                  setAccuracy(null); // user placed it manually — uncertainty gone
                   pickAndReverseGeocode({ lat, lng });
                 },
               }}
