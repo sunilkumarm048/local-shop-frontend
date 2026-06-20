@@ -188,10 +188,17 @@ export default function LocationPicker({ value, onChange, defaultCenter }: Props
     setAccuracy(null);
 
     let best: GeolocationPosition | null = null;
-    const GOOD_ENOUGH_M = 30; // stop early once we're this accurate
-    const MAX_WAIT_MS = 15_000; // otherwise commit the best we got
+    let committed = false;
+    const GOOD_ENOUGH_M = 20; // genuinely precise (true GPS) — commit & stop
+    const SETTLE_AFTER_M = 50; // decent — keep refining a bit, then settle
+    const MAX_WAIT_MS = 35_000; // patient like a maps app (was 15s — too short)
+    let settleTimer: ReturnType<typeof setTimeout> | null = null;
 
-    const commit = async () => {
+    const finish = async () => {
+      if (committed) return;
+      committed = true;
+      if (settleTimer) clearTimeout(settleTimer);
+      clearTimeout(stopTimer);
       if (watchRef.current != null) {
         navigator.geolocation.clearWatch(watchRef.current);
         watchRef.current = null;
@@ -206,7 +213,7 @@ export default function LocationPicker({ value, onChange, defaultCenter }: Props
       const ll = { lat: best.coords.latitude, lng: best.coords.longitude };
       const acc = best.coords.accuracy;
       setAccuracy(acc);
-      setGpsFix(ll); // triggers close zoom-in
+      setGpsFix(ll);
       await pickAndReverseGeocode(ll);
 
       if (acc > 75) {
@@ -220,23 +227,32 @@ export default function LocationPicker({ value, onChange, defaultCenter }: Props
       setLocating(false);
     };
 
-    const stopTimer = setTimeout(commit, MAX_WAIT_MS);
+    const stopTimer = setTimeout(finish, MAX_WAIT_MS);
 
     watchRef.current = navigator.geolocation.watchPosition(
       (pos) => {
-        // Keep the most accurate reading seen so far.
+        // Keep — and live-show — the most accurate reading so far.
         if (!best || pos.coords.accuracy < best.coords.accuracy) {
           best = pos;
+          const ll = { lat: pos.coords.latitude, lng: pos.coords.longitude };
           setAccuracy(pos.coords.accuracy);
+          // Live-move the pin + circle as it tightens (like a maps app).
+          setGpsFix(ll);
+          pickAndReverseGeocode(ll);
         }
-        // Good enough? Commit immediately.
-        if (pos.coords.accuracy <= GOOD_ENOUGH_M) {
-          clearTimeout(stopTimer);
-          commit();
+
+        const acc = pos.coords.accuracy;
+        if (acc <= GOOD_ENOUGH_M) {
+          // Truly precise — done.
+          finish();
+        } else if (acc <= SETTLE_AFTER_M && !settleTimer) {
+          // Decent fix — give GPS ~6 more seconds to tighten, then settle.
+          settleTimer = setTimeout(finish, 6_000);
         }
       },
       (err) => {
         clearTimeout(stopTimer);
+        if (settleTimer) clearTimeout(settleTimer);
         if (watchRef.current != null) {
           navigator.geolocation.clearWatch(watchRef.current);
           watchRef.current = null;
@@ -396,6 +412,13 @@ export default function LocationPicker({ value, onChange, defaultCenter }: Props
           )}
           Use my location
         </Button>
+        {locating && (
+          <span className="text-xs text-muted-foreground">
+            {accuracy != null
+              ? `Locating… ~${Math.round(accuracy)} m, improving`
+              : 'Getting GPS… please wait outdoors'}
+          </span>
+        )}
       </div>
 
       {/* Map */}
