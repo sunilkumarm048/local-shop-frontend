@@ -120,6 +120,7 @@ function Recenter({ target }: { target: LatLng | null }) {
 export default function LocationPicker({ value, onChange, defaultCenter }: Props) {
   const [locating, setLocating] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);
+  const [geoIsNote, setGeoIsNote] = useState(false);
 
   // Search state
   const [query, setQuery] = useState('');
@@ -160,16 +161,54 @@ export default function LocationPicker({ value, onChange, defaultCenter }: Props
     }
     setLocating(true);
     setGeoError(null);
+    setGeoIsNote(false);
+
+    const onSuccess = async (pos: GeolocationPosition) => {
+      await pickAndReverseGeocode({
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+      });
+      // If the fix is rough (e.g. wifi/cell, not GPS), nudge the user to refine.
+      if (pos.coords.accuracy && pos.coords.accuracy > 100) {
+        setGeoIsNote(true);
+        setGeoError(
+          'Got an approximate location — please drag the pin to your exact shop.'
+        );
+      } else {
+        setGeoError(null);
+      }
+      setLocating(false);
+    };
+
+    const describe = (err: GeolocationPositionError) => {
+      if (err.code === err.PERMISSION_DENIED)
+        return 'Location permission blocked. Allow location access in your browser settings, then try again — or drag the pin manually.';
+      if (err.code === err.POSITION_UNAVAILABLE)
+        return 'Could not determine your location. Please drag the pin to your shop.';
+      return 'Finding your location took too long. Please drag the pin to your shop, or try again outdoors for a better GPS signal.';
+    };
+
+    // Stage 2: quicker, lower-accuracy network fix as a fallback.
+    const tryLowAccuracy = () => {
+      navigator.geolocation.getCurrentPosition(onSuccess, (err) => {
+        setGeoError(describe(err));
+        setLocating(false);
+      }, { enableHighAccuracy: false, timeout: 15_000, maximumAge: 60_000 });
+    };
+
+    // Stage 1: high-accuracy GPS, longer timeout, allow a recent cached fix.
     navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        await pickAndReverseGeocode({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        setLocating(false);
-      },
+      onSuccess,
       (err) => {
-        setGeoError(err.message || 'Could not get your location.');
-        setLocating(false);
+        if (err.code === err.TIMEOUT || err.code === err.POSITION_UNAVAILABLE) {
+          // GPS lock failed — fall back to a fast network-based estimate.
+          tryLowAccuracy();
+        } else {
+          setGeoError(describe(err));
+          setLocating(false);
+        }
       },
-      { enableHighAccuracy: true, timeout: 10_000 }
+      { enableHighAccuracy: true, timeout: 20_000, maximumAge: 30_000 }
     );
   }
 
@@ -378,7 +417,11 @@ export default function LocationPicker({ value, onChange, defaultCenter }: Props
         </div>
       </div>
 
-      {geoError && <p className="text-xs text-destructive">{geoError}</p>}
+      {geoError && (
+        <p className={`text-xs ${geoIsNote ? 'text-amber-600' : 'text-destructive'}`}>
+          {geoError}
+        </p>
+      )}
     </div>
   );
 }
