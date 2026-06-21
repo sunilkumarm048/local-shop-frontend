@@ -132,6 +132,28 @@ function MyJobCard({
         ? 'to_customer'
         : null;
 
+  // Open turn-by-turn directions in Google Maps (opens the Maps app on phones,
+  // a new tab on desktop). Prefers exact coordinates; falls back to a text
+  // address if coordinates are missing.
+  function openGoogleMapsTo(
+    ll: { lat: number; lng: number } | null,
+    address?: string | null
+  ) {
+    let destination = '';
+    if (ll) destination = `${ll.lat},${ll.lng}`;
+    else if (address) destination = address;
+    else return;
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
+      destination
+    )}&travelmode=driving`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }
+
+  const shopAddress = job.shop?.address
+    ? [job.shop.address.line1, job.shop.address.city].filter(Boolean).join(', ')
+    : null;
+  const custAddress = job.recipient?.address || null;
+
   return (
     <Card className="border-brand-green/40 overflow-hidden">
       <CardContent className="pt-4 space-y-3">
@@ -230,33 +252,63 @@ function MyJobCard({
 
         {/* Lifecycle action */}
         {job.status === 'ready_for_pickup' && (
-          <Button className="w-full" disabled={busy} onClick={() => run(() => markPickedUp(job._id))}>
-            {busy ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <PackageCheck className="h-4 w-4 mr-2" />
-            )}
-            Confirm pickup from shop
-          </Button>
+          <>
+            <Button
+              variant="outline"
+              className="w-full border-brand-green/50 text-brand-green hover:bg-brand-green/5"
+              onClick={() => openGoogleMapsTo(shopLL, shopAddress)}
+            >
+              <Navigation className="h-4 w-4 mr-2" />
+              Navigate to shop in Google Maps
+            </Button>
+            <Button className="w-full" disabled={busy} onClick={() => run(() => markPickedUp(job._id))}>
+              {busy ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <PackageCheck className="h-4 w-4 mr-2" />
+              )}
+              Confirm pickup from shop
+            </Button>
+          </>
         )}
         {job.status === 'picked_up' && (
-          <Button className="w-full" disabled={busy} onClick={() => run(() => markOnWay(job._id))}>
-            {busy ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Truck className="h-4 w-4 mr-2" />
-            )}
-            Start delivery
-          </Button>
+          <>
+            <Button
+              variant="outline"
+              className="w-full border-brand-green/50 text-brand-green hover:bg-brand-green/5"
+              onClick={() => openGoogleMapsTo(custLL, custAddress)}
+            >
+              <Navigation className="h-4 w-4 mr-2" />
+              Navigate to customer in Google Maps
+            </Button>
+            <Button className="w-full" disabled={busy} onClick={() => run(() => markOnWay(job._id))}>
+              {busy ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Truck className="h-4 w-4 mr-2" />
+              )}
+              Start delivery
+            </Button>
+          </>
         )}
         {job.status === 'out_for_delivery' && (
-          <DeliverWithProof
-            jobId={job._id}
-            busy={busy}
-            onDelivered={(proofImageUrl) =>
-              run(() => markDelivered(job._id, { proofImageUrl: proofImageUrl || undefined }))
-            }
-          />
+          <>
+            <Button
+              variant="outline"
+              className="w-full border-brand-green/50 text-brand-green hover:bg-brand-green/5"
+              onClick={() => openGoogleMapsTo(custLL, custAddress)}
+            >
+              <Navigation className="h-4 w-4 mr-2" />
+              Navigate to customer in Google Maps
+            </Button>
+            <DeliverWithProof
+              jobId={job._id}
+              busy={busy}
+              onDelivered={(proofImageUrl) =>
+                run(() => markDelivered(job._id, { proofImageUrl: proofImageUrl || undefined }))
+              }
+            />
+          </>
         )}
       </CardContent>
     </Card>
