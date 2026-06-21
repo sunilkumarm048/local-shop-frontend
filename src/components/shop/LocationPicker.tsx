@@ -587,11 +587,14 @@ export default function LocationPicker({ value, onChange, defaultCenter }: Props
                 url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
                 maxZoom={19}
               />
-              {/* Road/place labels on top of satellite, so names are visible. */}
+              {/* Transparent labels overlay (CARTO, OSM data) — shows village
+                  names, roads, schools, temples even in rural areas, so users
+                  can orient like on Google Maps. */}
               <TileLayer
-                attribution=""
-                url="https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"
-                maxZoom={19}
+                attribution='&copy; OpenStreetMap, &copy; CARTO'
+                url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png"
+                subdomains="abcd"
+                maxZoom={20}
               />
             </>
           ) : (
