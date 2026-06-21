@@ -138,6 +138,10 @@ export default function LocationPicker({ value, onChange, defaultCenter }: Props
   // Satellite vs map tiles — satellite helps rural users recognise their area.
   const [satellite, setSatellite] = useState(true);
   const watchRef = useRef<number | null>(null);
+  // Browser location permission: 'granted' | 'denied' | 'prompt' | null (unknown)
+  const [permission, setPermission] = useState<string | null>(null);
+  // Whether to show the "GPS is weak / how to fix" help panel (poor accuracy).
+  const [showAccuracyHelp, setShowAccuracyHelp] = useState(false);
 
   // Search state
   const [query, setQuery] = useState('');
@@ -186,6 +190,7 @@ export default function LocationPicker({ value, onChange, defaultCenter }: Props
     setGeoError(null);
     setGeoIsNote(false);
     setAccuracy(null);
+    setShowAccuracyHelp(false);
 
     let best: GeolocationPosition | null = null;
     let committed = false;
@@ -231,10 +236,12 @@ export default function LocationPicker({ value, onChange, defaultCenter }: Props
 
       if (acc > 75) {
         setGeoIsNote(true);
+        setShowAccuracyHelp(true);
         setGeoError(
           `Location is approximate (within ~${Math.round(acc)} m). Switch to Satellite and drag the pin onto your shop.`
         );
       } else {
+        setShowAccuracyHelp(false);
         setGeoError(null);
       }
       setLocating(false);
@@ -294,6 +301,26 @@ export default function LocationPicker({ value, onChange, defaultCenter }: Props
       if (watchRef.current != null) {
         navigator.geolocation.clearWatch(watchRef.current);
       }
+    };
+  }, []);
+
+  // Detect the browser's location-permission state up front, so we can guide
+  // the user. The Permissions API isn't on every browser — degrade silently.
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !navigator.permissions?.query) return;
+    let cancelled = false;
+    navigator.permissions
+      .query({ name: 'geolocation' as PermissionName })
+      .then((status) => {
+        if (cancelled) return;
+        setPermission(status.state);
+        status.onchange = () => setPermission(status.state);
+      })
+      .catch(() => {
+        /* not supported — ignore */
+      });
+    return () => {
+      cancelled = true;
     };
   }, []);
 
@@ -498,6 +525,9 @@ export default function LocationPicker({ value, onChange, defaultCenter }: Props
                 dragend: (e) => {
                   const { lat, lng } = (e.target as L.Marker).getLatLng();
                   setAccuracy(null); // user placed it manually — uncertainty gone
+                  setShowAccuracyHelp(false);
+                  setGeoError(null);
+                  setGeoIsNote(false);
                   pickAndReverseGeocode({ lat, lng });
                 },
               }}
@@ -550,6 +580,47 @@ export default function LocationPicker({ value, onChange, defaultCenter }: Props
         <p className={`text-xs ${geoIsNote ? 'text-amber-600' : 'text-destructive'}`}>
           {geoError}
         </p>
+      )}
+
+      {/* Permission blocked — guide the user to re-enable it. */}
+      {permission === 'denied' && (
+        <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-xs text-foreground/80 space-y-1">
+          <p className="font-medium text-destructive">Location access is blocked</p>
+          <p>To use “Use my location”, allow location for this site:</p>
+          <p>
+            Tap the <span className="font-medium">lock / ⓘ icon</span> next to the
+            web address → <span className="font-medium">Permissions</span> →
+            set <span className="font-medium">Location</span> to{' '}
+            <span className="font-medium">Allow</span>, then reload.
+          </p>
+          <p className="text-muted-foreground">
+            You can also just search your area above and drag the pin.
+          </p>
+        </div>
+      )}
+
+      {/* Poor accuracy — explain how to get a precise GPS fix. */}
+      {showAccuracyHelp && (
+        <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 space-y-1.5">
+          <p className="font-medium">Getting a more accurate location</p>
+          <p>Your phone gave only an approximate position. To improve it:</p>
+          <ul className="list-disc pl-4 space-y-0.5">
+            <li>
+              Turn on <span className="font-medium">High accuracy</span> location:
+              Settings → Location → turn on{' '}
+              <span className="font-medium">Google Location Accuracy</span>.
+            </li>
+            <li>
+              Allow <span className="font-medium">Precise</span> (not Approximate)
+              location for your browser in App settings.
+            </li>
+            <li>Go outdoors with open sky and try again.</li>
+          </ul>
+          <p className="font-medium pt-1">
+            Easiest: tap <span className="underline">Satellite</span> above and drag
+            the pin onto your shop’s roof — that’s always exact.
+          </p>
+        </div>
       )}
     </div>
   );
