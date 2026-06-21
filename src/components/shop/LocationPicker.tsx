@@ -12,6 +12,23 @@ import { Label } from '@/components/ui/label';
 import { geoSearch } from '@/lib/geo';
 
 /**
+ * Minimal shape of the Capacitor Geolocation plugin — declared locally so the
+ * web build doesn't need @capacitor/geolocation installed. The actual plugin
+ * is loaded at runtime only inside the native app.
+ */
+type NativeGeoPos = { coords: { latitude: number; longitude: number; accuracy?: number } };
+type NativeGeoPerm = { location: string };
+interface NativeGeo {
+  checkPermissions: () => Promise<NativeGeoPerm>;
+  requestPermissions: () => Promise<NativeGeoPerm>;
+  getCurrentPosition: (opts: {
+    enableHighAccuracy?: boolean;
+    timeout?: number;
+    maximumAge?: number;
+  }) => Promise<NativeGeoPos>;
+}
+
+/**
  * Leaflet ships its marker icons as separate files. Bundlers don't resolve them
  * correctly. We use a custom divIcon below, but the default icon also gets
  * referenced internally, so patch it once.
@@ -181,23 +198,29 @@ export default function LocationPicker({ value, onChange, defaultCenter }: Props
   async function tryNativeLocation(): Promise<boolean> {
     try {
       // Capacitor injects window.Capacitor at runtime in the native app only.
-      // Gate the dynamic imports on this so the web build never needs the
-      // @capacitor packages installed.
       const w = window as unknown as {
         Capacitor?: { isNativePlatform?: () => boolean };
       };
       if (!w.Capacitor?.isNativePlatform?.()) return false;
 
-      const geo = await import(
-        /* webpackIgnore: true */ '@capacitor/geolocation'
-      ).catch(() => null);
-      if (!geo?.Geolocation) return false;
+      // Load the plugin without letting TypeScript/webpack resolve the module
+      // at build time (the package is only installed in the native build, not
+      // on Vercel). The indirection via a variable specifier keeps the web
+      // build from needing @capacitor/geolocation.
+      const dynImport = new Function('m', 'return import(m)') as (
+        m: string
+      ) => Promise<unknown>;
+      const mod = (await dynImport('@capacitor/geolocation').catch(
+        () => null
+      )) as { Geolocation?: NativeGeo } | null;
+      const Geolocation = mod?.Geolocation;
+      if (!Geolocation) return false;
 
       // Ensure permission (native prompt).
       try {
-        const perm = await geo.Geolocation.checkPermissions();
+        const perm = await Geolocation.checkPermissions();
         if (perm.location !== 'granted') {
-          const req = await geo.Geolocation.requestPermissions();
+          const req = await Geolocation.requestPermissions();
           if (req.location !== 'granted') {
             setPermission('denied');
             setGeoError(
@@ -211,7 +234,7 @@ export default function LocationPicker({ value, onChange, defaultCenter }: Props
         /* checkPermissions may be unavailable — continue to getCurrentPosition */
       }
 
-      const pos = await geo.Geolocation.getCurrentPosition({
+      const pos = await Geolocation.getCurrentPosition({
         enableHighAccuracy: true,
         timeout: 30_000,
         maximumAge: 0,
