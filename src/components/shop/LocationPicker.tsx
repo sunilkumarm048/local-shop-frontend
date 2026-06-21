@@ -175,9 +175,87 @@ export default function LocationPicker({ value, onChange, defaultCenter }: Props
     onChange(ll, hints);
   }
 
+  // Native (Capacitor) high-accuracy path — uses Android Fused Location
+  // Provider, which is far more accurate than browser geolocation. Dynamically
+  // imported so the web build doesn't require the Capacitor packages.
+  async function tryNativeLocation(): Promise<boolean> {
+    try {
+      // Capacitor injects window.Capacitor at runtime in the native app only.
+      // Gate the dynamic imports on this so the web build never needs the
+      // @capacitor packages installed.
+      const w = window as unknown as {
+        Capacitor?: { isNativePlatform?: () => boolean };
+      };
+      if (!w.Capacitor?.isNativePlatform?.()) return false;
+
+      const geo = await import(
+        /* webpackIgnore: true */ '@capacitor/geolocation'
+      ).catch(() => null);
+      if (!geo?.Geolocation) return false;
+
+      // Ensure permission (native prompt).
+      try {
+        const perm = await geo.Geolocation.checkPermissions();
+        if (perm.location !== 'granted') {
+          const req = await geo.Geolocation.requestPermissions();
+          if (req.location !== 'granted') {
+            setPermission('denied');
+            setGeoError(
+              'Location permission is needed. Please enable it for the app, then try again.'
+            );
+            setLocating(false);
+            return true; // handled (as a denial)
+          }
+        }
+      } catch {
+        /* checkPermissions may be unavailable — continue to getCurrentPosition */
+      }
+
+      const pos = await geo.Geolocation.getCurrentPosition({
+        enableHighAccuracy: true,
+        timeout: 30_000,
+        maximumAge: 0,
+      });
+      const ll = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      const acc = pos.coords.accuracy ?? 0;
+      setAccuracy(acc);
+      setGpsFix(ll);
+      await pickAndReverseGeocode(ll);
+      if (acc > 75) {
+        setGeoIsNote(true);
+        setShowAccuracyHelp(true);
+        setGeoError(
+          `Location is approximate (within ~${Math.round(acc)} m). Switch to Satellite and drag the pin onto your shop.`
+        );
+      } else {
+        setShowAccuracyHelp(false);
+        setGeoError(null);
+      }
+      setLocating(false);
+      return true;
+    } catch {
+      return false; // fall back to browser geolocation
+    }
+  }
+
   function useMyLocation() {
+    setLocating(true);
+    setGeoError(null);
+    setGeoIsNote(false);
+    setAccuracy(null);
+    setShowAccuracyHelp(false);
+
+    // Prefer the native high-accuracy provider when available.
+    tryNativeLocation().then((handled) => {
+      if (handled) return;
+      runBrowserLocation();
+    });
+  }
+
+  function runBrowserLocation() {
     if (!navigator.geolocation) {
       setGeoError('Geolocation not supported by this browser.');
+      setLocating(false);
       return;
     }
     // Cancel any in-flight watch.
@@ -185,12 +263,6 @@ export default function LocationPicker({ value, onChange, defaultCenter }: Props
       navigator.geolocation.clearWatch(watchRef.current);
       watchRef.current = null;
     }
-
-    setLocating(true);
-    setGeoError(null);
-    setGeoIsNote(false);
-    setAccuracy(null);
-    setShowAccuracyHelp(false);
 
     let best: GeolocationPosition | null = null;
     let committed = false;
