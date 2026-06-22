@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/stores/auth';
 import { useUser } from '@/hooks/useUser';
 import { logout } from '@/lib/auth';
-import { fetchMyShops, updateShop } from '@/lib/owner';
+import { fetchMyShops, updateShop, setShopAvailability } from '@/lib/owner';
 import { ApiError } from '@/lib/api';
 import type { Shop } from '@/lib/shops';
 
@@ -120,7 +120,7 @@ export default function ShopDashboard() {
       />
 
       <main className="flex-1 container py-6">
-        <SectionNav current={section} onChange={setSection} />
+        <SectionNav current={section} onChange={setSection} isService={shop.isService} />
 
         <div className="mt-6">
           {section === 'storefront' && (
@@ -129,8 +129,8 @@ export default function ShopDashboard() {
               onUpdated={(s) => setShops((prev) => (prev ? [s, ...prev.slice(1)] : [s]))}
             />
           )}
-          {section === 'products' && <ProductsTab shopId={shop._id} />}
-          {section === 'catalog' && <CatalogTab shopId={shop._id} />}
+          {section === 'products' && !shop.isService && <ProductsTab shopId={shop._id} />}
+          {section === 'catalog' && !shop.isService && <CatalogTab shopId={shop._id} />}
           {section === 'orders' && <OrdersTab shopId={shop._id} />}
           {section === 'analytics' && <ShopAnalyticsTab />}
         </div>
@@ -165,6 +165,20 @@ function ShopHeader({ shop, userName, onShopUpdated, onLogout }: HeaderProps) {
       setToggleError(err instanceof ApiError ? err.message : 'Could not update.');
     } finally {
       setToggling(false);
+    }
+  }
+
+  const [togglingAvail, setTogglingAvail] = useState(false);
+  async function toggleAvailable() {
+    setTogglingAvail(true);
+    setToggleError(null);
+    try {
+      const r = await setShopAvailability(shop._id, !shop.availableNow);
+      onShopUpdated({ ...shop, availableNow: r.availableNow });
+    } catch (err) {
+      setToggleError(err instanceof ApiError ? err.message : 'Could not update.');
+    } finally {
+      setTogglingAvail(false);
     }
   }
 
@@ -206,6 +220,31 @@ function ShopHeader({ shop, userName, onShopUpdated, onLogout }: HeaderProps) {
           {shop.isOpen ? 'OPEN' : 'CLOSED'}
         </button>
 
+        {shop.isService && (
+          <button
+            type="button"
+            onClick={toggleAvailable}
+            disabled={togglingAvail}
+            aria-label={shop.availableNow ? 'Go offline' : 'Go available'}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold shrink-0 transition-colors ${
+              shop.availableNow
+                ? 'bg-brand-green text-white hover:bg-brand-green/90'
+                : 'bg-white/70 hover:bg-white text-black'
+            } ${togglingAvail ? 'opacity-60 cursor-wait' : ''}`}
+          >
+            {togglingAvail ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <span
+                className={`h-2 w-2 rounded-full ${
+                  shop.availableNow ? 'bg-white' : 'bg-muted-foreground'
+                }`}
+              />
+            )}
+            {shop.availableNow ? 'AVAILABLE' : 'UNAVAILABLE'}
+          </button>
+        )}
+
         <Button
           variant="ghost"
           size="icon"
@@ -242,16 +281,21 @@ function ShopHeader({ shop, userName, onShopUpdated, onLogout }: HeaderProps) {
 interface NavProps {
   current: Section;
   onChange: (s: Section) => void;
+  isService?: boolean;
 }
 
-function SectionNav({ current, onChange }: NavProps) {
+function SectionNav({ current, onChange, isService }: NavProps) {
   const items: Array<{ id: Section; label: string; icon: typeof Store }> = [
     { id: 'storefront', label: 'Storefront', icon: Store },
     { id: 'products', label: 'Products', icon: Package },
     { id: 'catalog', label: 'Catalog', icon: PackagePlus },
     { id: 'orders', label: 'Orders', icon: ListOrdered },
     { id: 'analytics', label: 'Analytics', icon: TrendingUp },
-  ];
+  ].filter(
+    // Service providers (plumber, electrician, etc.) don't sell SKU products,
+    // so hide the Products and Catalog tabs for them.
+    (it) => !(isService && (it.id === 'products' || it.id === 'catalog'))
+  );
   return (
     <nav className="flex gap-1 border-b">
       {items.map(({ id, label, icon: Icon }) => {
@@ -288,4 +332,3 @@ function FullPageLoader({ label }: { label: string }) {
     </div>
   );
 }
-  
