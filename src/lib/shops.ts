@@ -9,6 +9,10 @@ export interface Shop {
   category?: string;
   phone?: string;
   isOpen: boolean;
+  /** True when this shop is a service provider (plumber, electrician, etc.). */
+  isService?: boolean;
+  /** Service providers: currently available for home visits. */
+  availableNow?: boolean;
   rating: number;
   ratingCount: number;
   gallery?: string[];
