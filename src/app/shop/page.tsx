@@ -285,15 +285,16 @@ interface NavProps {
 }
 
 function SectionNav({ current, onChange, isService }: NavProps) {
-  const items: Array<{ id: Section; label: string; icon: typeof Store }> = [
+  const allItems: Array<{ id: Section; label: string; icon: typeof Store }> = [
     { id: 'storefront', label: 'Storefront', icon: Store },
     { id: 'products', label: 'Products', icon: Package },
     { id: 'catalog', label: 'Catalog', icon: PackagePlus },
     { id: 'orders', label: 'Orders', icon: ListOrdered },
     { id: 'analytics', label: 'Analytics', icon: TrendingUp },
-  ].filter(
-    // Service providers (plumber, electrician, etc.) don't sell SKU products,
-    // so hide the Products and Catalog tabs for them.
+  ];
+  // Service providers (plumber, electrician, etc.) don't sell SKU products,
+  // so hide the Products and Catalog tabs for them.
+  const items = allItems.filter(
     (it) => !(isService && (it.id === 'products' || it.id === 'catalog'))
   );
   return (
