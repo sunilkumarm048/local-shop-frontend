@@ -89,6 +89,20 @@ export async function updateShop(id: string, payload: UpdateShopPayload) {
   });
 }
 
+/**
+ * Service provider toggles "available now" (live home-visit availability).
+ */
+export async function setShopAvailability(id: string, availableNow: boolean) {
+  return api<{ _id: string; availableNow: boolean }>(
+    `/shops/${id}/availability`,
+    {
+      method: 'PATCH',
+      body: { availableNow },
+      token: token(),
+    }
+  );
+}
+
 export async function fetchCategories() {
   return api<{ categories: Category[] }>('/shops/categories');
 }
