@@ -139,13 +139,21 @@ function ServiceCard({ shop, km }: { shop: Shop; km: number | null }) {
 
       {/* Body */}
       <div className="flex-1 min-w-0">
-        {/* Distance pill */}
-        {km != null && (
-          <div className="inline-flex items-center gap-1 text-[11px] font-bold text-[#1857c1] bg-[#dbe9ff] px-1.5 py-0.5 rounded mb-1">
-            <MapPin className="h-3 w-3" />
-            {formatDistance(km)} away
-          </div>
-        )}
+        {/* Distance pill + live availability */}
+        <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+          {km != null && (
+            <div className="inline-flex items-center gap-1 text-[11px] font-bold text-[#1857c1] bg-[#dbe9ff] px-1.5 py-0.5 rounded">
+              <MapPin className="h-3 w-3" />
+              {formatDistance(km)} away
+            </div>
+          )}
+          {shop.availableNow && (
+            <div className="inline-flex items-center gap-1 text-[11px] font-bold text-white bg-brand-green px-1.5 py-0.5 rounded">
+              <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
+              Available now
+            </div>
+          )}
+        </div>
 
         <Link href={`/customer/shop/${shop._id}`} className="block">
           <h3 className="text-sm font-bold leading-tight truncate">
