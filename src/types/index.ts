@@ -1,5 +1,15 @@
 export type UserRole = 'customer' | 'shop' | 'delivery' | 'admin';
 
+export interface UserAddress {
+  label?: string;
+  line1?: string;
+  line2?: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  location?: { type: 'Point'; coordinates: [number, number] };
+}
+
 export interface User {
   id: string;
   name?: string;
@@ -7,6 +17,7 @@ export interface User {
   phone?: string;
   roles: UserRole[];
   avatar?: string;
+  addresses?: UserAddress[];
 }
 
 export interface CartItem {
