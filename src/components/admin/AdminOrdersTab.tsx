@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Loader2, Phone, MapPin, User, Store, Truck } from 'lucide-react';
+import { Loader2, Phone, MapPin, User, Store, Truck, Search, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -36,6 +36,7 @@ export function AdminOrdersTab() {
   const [orders, setOrders] = useState<AdminOrder[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [search, setSearch] = useState('');
 
   const refresh = useCallback(async () => {
     setRefreshing(true);
@@ -54,16 +55,70 @@ export function AdminOrdersTab() {
     refresh();
   }, [refresh]);
 
+  // Client-side search over the loaded orders. Matches order id (short code or
+  // full), shop name, customer/recipient name & phone, and delivery partner.
+  const q = search.trim().toLowerCase();
+  const filteredOrders =
+    orders == null
+      ? null
+      : q === ''
+        ? orders
+        : orders.filter((o) => {
+            const hay = [
+              o._id,
+              o._id.slice(-6),
+              o.shop?.name,
+              o.shop?.phone,
+              o.customer?.name,
+              o.customer?.phone,
+              o.customer?.email,
+              o.recipient?.name,
+              o.recipient?.phone,
+              o.recipient?.address,
+              o.deliveryPartner?.name,
+              o.deliveryPartner?.phone,
+              o.status,
+            ]
+              .filter(Boolean)
+              .join(' ')
+              .toLowerCase();
+            return hay.includes(q);
+          });
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div>
           <h2 className="text-xl font-semibold">Orders</h2>
           <p className="text-sm text-muted-foreground">
-            {orders ? `${orders.length} order${orders.length === 1 ? '' : 's'}` : 'Loading…'}
+            {filteredOrders
+              ? `${filteredOrders.length} order${filteredOrders.length === 1 ? '' : 's'}${
+                  q ? ` matching “${search.trim()}”` : ''
+                }`
+              : 'Loading…'}
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search id, shop, customer, phone…"
+              className="h-9 w-56 rounded-md border border-input bg-background pl-8 pr-8 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                aria-label="Clear search"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value)}
@@ -99,15 +154,15 @@ export function AdminOrdersTab() {
           <Loader2 className="h-5 w-5 animate-spin mr-2" />
           Loading…
         </div>
-      ) : orders.length === 0 ? (
+      ) : filteredOrders && filteredOrders.length === 0 ? (
         <Card>
           <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            No orders match.
+            {q ? `No orders match “${search.trim()}”.` : 'No orders match.'}
           </CardContent>
         </Card>
       ) : (
         <div className="space-y-2">
-          {orders.map((o) => (
+          {filteredOrders?.map((o) => (
             <OrderRow key={o._id} order={o} />
           ))}
         </div>
