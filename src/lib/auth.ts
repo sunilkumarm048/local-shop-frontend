@@ -63,6 +63,31 @@ export async function refreshMe() {
   }
 }
 
+export interface ProfileUpdate {
+  name?: string;
+  avatar?: string;
+  addresses?: Array<{
+    label?: string;
+    line1?: string;
+    line2?: string;
+    city?: string;
+    state?: string;
+    pincode?: string;
+    location?: { lng: number; lat: number };
+  }>;
+}
+
+export async function updateProfile(input: ProfileUpdate) {
+  const token = useAuth.getState().token;
+  const { user } = await api<{ user: User }>('/auth/me', {
+    method: 'PATCH',
+    body: input,
+    token,
+  });
+  useAuth.setState({ user });
+  return user;
+}
+
 export async function logout() {
   const token = useAuth.getState().token;
   try {
