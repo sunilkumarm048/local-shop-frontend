@@ -119,6 +119,16 @@ export function Header() {
                 <div className="px-4 pt-2 pb-1 text-[10px] font-bold text-muted-foreground tracking-wider uppercase">
                   Shopping
                 </div>
+                {user && (
+                  <DropdownItem
+                    href="/customer/profile"
+                    onClose={() => setOpen(false)}
+                    iconBg="bg-[#e8d6f7]"
+                    icon={<UserIcon className="h-[18px] w-[18px] text-[#6b3aa0]" />}
+                    title="My Profile"
+                    subtitle="Name, photo & addresses"
+                  />
+                )}
                 <DropdownItem
                   href="/checkout"
                   onClose={() => setOpen(false)}
