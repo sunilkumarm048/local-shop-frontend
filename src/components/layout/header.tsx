@@ -9,6 +9,7 @@ import {
   LogOut,
   MapPin,
   ScrollText,
+  CalendarCheck,
   Compass,
   Store,
   Truck,
@@ -152,6 +153,16 @@ export function Header() {
                   title="Order History"
                   subtitle="All your past orders"
                 />
+                {user && (
+                  <DropdownItem
+                    href="/customer/bookings"
+                    onClose={() => setOpen(false)}
+                    iconBg="bg-[#dcf3e1]"
+                    icon={<CalendarCheck className="h-[18px] w-[18px] text-[#0C831F]" />}
+                    title="My Bookings"
+                    subtitle="Track your service bookings"
+                  />
+                )}
                 <DropdownItem
                   href="/customer"
                   onClose={() => setOpen(false)}
