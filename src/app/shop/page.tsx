@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Loader2, LogOut, Package, Store, ListOrdered, TrendingUp, PackagePlus } from 'lucide-react';
+import { Loader2, LogOut, Package, Store, ListOrdered, TrendingUp, PackagePlus, CalendarCheck } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/stores/auth';
@@ -17,10 +17,11 @@ import { ShopWizard } from '@/components/shop/ShopWizard';
 import { StorefrontTab } from '@/components/shop/StorefrontTab';
 import { ProductsTab } from '@/components/shop/ProductsTab';
 import { OrdersTab } from '@/components/shop/OrdersTab';
+import { BookingsTab } from '@/components/shop/BookingsTab';
 import { ShopAnalyticsTab } from '@/components/shop/ShopAnalyticsTab';
 import { CatalogTab } from '@/components/shop/CatalogTab';
 
-type Section = 'storefront' | 'products' | 'catalog' | 'orders' | 'analytics';
+type Section = 'storefront' | 'products' | 'catalog' | 'orders' | 'bookings' | 'analytics';
 
 export default function ShopDashboard() {
   const router = useRouter();
@@ -132,6 +133,7 @@ export default function ShopDashboard() {
           {section === 'products' && !shop.isService && <ProductsTab shopId={shop._id} />}
           {section === 'catalog' && !shop.isService && <CatalogTab shopId={shop._id} />}
           {section === 'orders' && <OrdersTab shopId={shop._id} />}
+          {section === 'bookings' && <BookingsTab />}
           {section === 'analytics' && <ShopAnalyticsTab />}
         </div>
       </main>
@@ -289,14 +291,17 @@ function SectionNav({ current, onChange, isService }: NavProps) {
     { id: 'storefront', label: 'Storefront', icon: Store },
     { id: 'products', label: 'Products', icon: Package },
     { id: 'catalog', label: 'Catalog', icon: PackagePlus },
+    { id: 'bookings', label: 'Bookings', icon: CalendarCheck },
     { id: 'orders', label: 'Orders', icon: ListOrdered },
     { id: 'analytics', label: 'Analytics', icon: TrendingUp },
   ];
-  // Service providers (plumber, electrician, etc.) don't sell SKU products,
-  // so hide the Products and Catalog tabs for them.
-  const items = allItems.filter(
-    (it) => !(isService && (it.id === 'products' || it.id === 'catalog'))
-  );
+  // Service providers (plumber, electrician, etc.) don't sell SKU products, so
+  // hide Products/Catalog AND the product Orders tab — they get Bookings instead.
+  // Product shops get Orders but not Bookings.
+  const items = allItems.filter((it) => {
+    if (isService) return it.id !== 'products' && it.id !== 'catalog' && it.id !== 'orders';
+    return it.id !== 'bookings';
+  });
   return (
     <nav className="flex gap-1 border-b">
       {items.map(({ id, label, icon: Icon }) => {
