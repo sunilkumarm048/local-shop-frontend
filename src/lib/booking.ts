@@ -13,7 +13,9 @@ export type BookingStatus =
 
 export interface Booking {
   _id: string;
-  customer: string;
+  customer:
+    | string
+    | { _id: string; name?: string; phone?: string; avatar?: string };
   provider:
     | string
     | {
@@ -99,6 +101,40 @@ export async function cancelBooking(id: string, reason?: string) {
   const { booking } = await api<{ booking: Booking }>(`/bookings/${id}/cancel`, {
     method: 'PATCH',
     body: { reason },
+    token: token(),
+  });
+  return booking;
+}
+
+/* ---------- Provider side (Stage B) ---------- */
+
+export async function fetchIncomingBookings(status?: string) {
+  const qs = status ? `?status=${encodeURIComponent(status)}` : '';
+  const { bookings } = await api<{ bookings: Booking[] }>(
+    `/bookings/provider/incoming${qs}`,
+    { token: token() }
+  );
+  return bookings;
+}
+
+export interface BookingStatusUpdate {
+  status:
+    | 'accepted'
+    | 'declined'
+    | 'scheduled'
+    | 'on_the_way'
+    | 'in_progress'
+    | 'completed'
+    | 'cancelled';
+  note?: string;
+  scheduledDate?: string;
+  scheduledSlot?: string;
+}
+
+export async function updateBookingStatus(id: string, update: BookingStatusUpdate) {
+  const { booking } = await api<{ booking: Booking }>(`/bookings/${id}/status`, {
+    method: 'PATCH',
+    body: update,
     token: token(),
   });
   return booking;
