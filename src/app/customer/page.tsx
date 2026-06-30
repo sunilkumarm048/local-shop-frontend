@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Minus, Plus, Search, ShoppingCart, Zap, ImageIcon, Star } from 'lucide-react';
+import { Minus, Plus, Search, ShoppingCart, Zap, ImageIcon, Star, Store, Wrench } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -186,6 +186,29 @@ export default function CustomerHome() {
     : null;
   const clothingMode = isClothingGroup(activeGroupNode);
   const serviceMode = isServicesGroup(activeGroupNode);
+
+  // The "Repairs & Services" group node, used by the Shop/Services toggle.
+  const servicesGroupNode = tree.find((g) => isServicesGroup(g)) || null;
+
+  // Top-level mode: 'shop' (products) vs 'services' (providers). Driven by the
+  // toggle. Services mode locks the active group to the services group.
+  const mode: 'shop' | 'services' = serviceMode ? 'services' : 'shop';
+
+  function switchMode(next: 'shop' | 'services') {
+    if (next === 'services') {
+      if (servicesGroupNode) {
+        setActiveGroup(servicesGroupNode._id);
+        setActiveCategory(null);
+      }
+    } else {
+      setActiveGroup(null);
+      setActiveCategory(null);
+    }
+    // Clear any active search when switching context.
+    setQuery('');
+    setSearchTerm('');
+    setSearchNote(null);
+  }
 
   // Services are sparser than grocery shops, so when the customer switches
   // into the Services group, widen the default search radius. Leaving services
@@ -388,13 +411,41 @@ export default function CustomerHome() {
     <main className="container py-5 space-y-5">
       <DeliveryLocationBar />
 
+      {/* Shop / Services toggle — split the two intents clearly. */}
+      {servicesGroupNode && (
+        <div className="flex gap-1 bg-muted p-1 rounded-xl">
+          <button
+            onClick={() => switchMode('shop')}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium transition-colors ${
+              mode === 'shop'
+                ? 'bg-primary text-primary-foreground'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Store className="h-4 w-4" />
+            Shop
+          </button>
+          <button
+            onClick={() => switchMode('services')}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium transition-colors ${
+              mode === 'services'
+                ? 'bg-primary text-primary-foreground'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Wrench className="h-4 w-4" />
+            Services
+          </button>
+        </div>
+      )}
+
       {/* Search — shops + products, AI-corrected on Enter */}
       <div className="space-y-1.5">
         <div className="flex gap-2">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search shops or products…"
+              placeholder={mode === 'services' ? 'Search a service…' : 'Search shops or products…'}
               value={query}
               onChange={(e) => {
                 const v = e.target.value;
@@ -420,8 +471,10 @@ export default function CustomerHome() {
         )}
       </div>
 
-      {/* Top-level group strip */}
-      {tree.length > 0 && (
+      {/* Top-level group strip — only in Shop mode. Services has its own toggle
+          + category picker, so the group chips are hidden there. The Services
+          group itself is excluded from the chips since the toggle handles it. */}
+      {mode === 'shop' && tree.length > 0 && (
         <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-none">
           <button
             onClick={() => {
@@ -436,23 +489,25 @@ export default function CustomerHome() {
           >
             All
           </button>
-          {tree.map((g) => (
-            <button
-              key={g._id}
-              onClick={() => {
-                setActiveGroup(activeGroup === g._id ? null : g._id);
-                setActiveCategory(null);
-              }}
-              className={`shrink-0 px-3 py-1.5 rounded-full text-sm font-medium border ${
-                activeGroup === g._id
-                  ? 'bg-primary text-primary-foreground border-primary'
-                  : 'bg-card border-border hover:bg-muted'
-              }`}
-            >
-              {g.icon && <span className="mr-1">{g.icon}</span>}
-              {g.name}
-            </button>
-          ))}
+          {tree
+            .filter((g) => !isServicesGroup(g))
+            .map((g) => (
+              <button
+                key={g._id}
+                onClick={() => {
+                  setActiveGroup(activeGroup === g._id ? null : g._id);
+                  setActiveCategory(null);
+                }}
+                className={`shrink-0 px-3 py-1.5 rounded-full text-sm font-medium border ${
+                  activeGroup === g._id
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'bg-card border-border hover:bg-muted'
+                }`}
+              >
+                {g.icon && <span className="mr-1">{g.icon}</span>}
+                {g.name}
+              </button>
+            ))}
         </div>
       )}
 
