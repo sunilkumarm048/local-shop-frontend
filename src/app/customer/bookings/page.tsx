@@ -12,12 +12,14 @@ import {
   Check,
   X,
   CalendarPlus,
+  Star,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { ApiError } from '@/lib/api';
 import { fetchMyBookings, cancelBooking, type Booking } from '@/lib/booking';
+import { submitReview } from '@/lib/reviews';
 import { useAuth } from '@/stores/auth';
 
 // The happy-path stages a booking moves through, in order. Used to draw the
@@ -246,7 +248,109 @@ function BookingTracker({
             </Button>
           )}
         </div>
+
+        {/* Review prompt — once the service is completed, invite a rating. This
+            is the trust signal that matters most for the directory model. */}
+        {booking.status === 'completed' && provider?._id && (
+          <ReviewPrompt shopId={provider._id} providerName={provider.name} />
+        )}
       </CardContent>
     </Card>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Review prompt — shown on a completed booking. Posts to the existing shop    */
+/* review endpoint (service shops accept any logged-in customer's review).     */
+/* -------------------------------------------------------------------------- */
+function ReviewPrompt({
+  shopId,
+  providerName,
+}: {
+  shopId: string;
+  providerName?: string;
+}) {
+  const token = useAuth((s) => s.token);
+  const [rating, setRating] = useState(0);
+  const [hover, setHover] = useState(0);
+  const [comment, setComment] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [done, setDone] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit() {
+    if (!rating) {
+      setError('Tap a star to rate.');
+      return;
+    }
+    if (!token) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      await submitReview(shopId, token, { rating, comment: comment.trim() || undefined });
+      setDone(true);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not submit your review.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (done) {
+    return (
+      <div className="mt-2 flex items-center gap-2 text-sm text-primary bg-primary/10 rounded-md px-3 py-2">
+        <Check className="h-4 w-4" />
+        Thanks for rating {providerName || 'this provider'}.
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-2 border-t pt-3 space-y-2">
+      <p className="text-xs font-medium text-muted-foreground">
+        How was the service?
+      </p>
+      <div className="flex gap-1" role="radiogroup" aria-label="Your rating">
+        {[1, 2, 3, 4, 5].map((n) => (
+          <button
+            key={n}
+            type="button"
+            aria-label={`${n} star${n > 1 ? 's' : ''}`}
+            onClick={() => {
+              setRating(n);
+              setError(null);
+            }}
+            onMouseEnter={() => setHover(n)}
+            onMouseLeave={() => setHover(0)}
+          >
+            <Star
+              className={`h-6 w-6 transition-colors ${
+                (hover || rating) >= n
+                  ? 'fill-[#f5b301] text-[#f5b301]'
+                  : 'text-muted-foreground/40'
+              }`}
+            />
+          </button>
+        ))}
+      </div>
+      <textarea
+        value={comment}
+        onChange={(e) => setComment(e.target.value)}
+        rows={2}
+        placeholder="Add a few words (optional)…"
+        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      />
+      {error && <p className="text-xs text-destructive">{error}</p>}
+      <Button size="sm" onClick={submit} disabled={submitting}>
+        {submitting ? (
+          <>
+            <Loader2 className="h-4 w-4 animate-spin mr-1" />
+            Submitting…
+          </>
+        ) : (
+          'Submit review'
+        )}
+      </Button>
+    </div>
   );
 }
