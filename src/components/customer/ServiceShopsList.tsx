@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { MapPin, Star, Clock, Phone, Navigation, Store, ChevronLeft } from 'lucide-react';
+import { MapPin, Star, Clock, Phone, Navigation, Store, ChevronLeft, CalendarPlus } from 'lucide-react';
 
 import { Card } from '@/components/ui/card';
 import { formatDistance } from '@/lib/geo';
@@ -218,6 +218,15 @@ function ServiceCard({ shop, km }: { shop: Shop; km: number | null }) {
             Directions
           </a>
         </div>
+
+        {/* Book a service visit (no price — provider confirms a time). */}
+        <Link
+          href={`/customer/book/${shop._id}`}
+          className="inline-flex items-center justify-center gap-1.5 w-full h-9 mt-2 rounded-md bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 transition-colors"
+        >
+          <CalendarPlus className="h-4 w-4" />
+          Book service
+        </Link>
       </div>
     </Card>
   );
