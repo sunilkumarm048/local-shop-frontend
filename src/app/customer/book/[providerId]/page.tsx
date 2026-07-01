@@ -7,7 +7,7 @@ import Link from 'next/link' ;
 import {
   Loader2,
   ArrowLeft,
-  CalendarPlus,
+  CalendarPlus ,
   Check,
   Store,
 } from 'lucide-react';
