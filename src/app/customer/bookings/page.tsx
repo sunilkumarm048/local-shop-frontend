@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -46,6 +46,11 @@ export default function MyBookingsPage() {
   const [bookings, setBookings] = useState<Booking[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  // Ref mirror of busyId so the polling interval reads the latest value.
+  const busyIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    busyIdRef.current = busyId;
+  }, [busyId]);
 
   async function load() {
     setError(null);
@@ -63,6 +68,12 @@ export default function MyBookingsPage() {
       return;
     }
     load();
+    // Auto-refresh so status changes from the provider show up on their own.
+    // Skip a tick while the user has an action in flight (cancel/review).
+    const interval = setInterval(() => {
+      if (!document.hidden && !busyIdRef.current) load();
+    }, 15000);
+    return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
