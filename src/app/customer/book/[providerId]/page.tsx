@@ -172,6 +172,22 @@ export default function BookServicePage() {
     );
   }
 
+  // Provider is on an active job — don't allow a new booking.
+  if (shop.busy) {
+    return (
+      <div className="container max-w-lg py-10 text-center space-y-3">
+        <p className="text-sm font-medium">{shop.name} is currently on a job.</p>
+        <p className="text-sm text-muted-foreground">
+          They aren&apos;t taking new bookings right now. You can still call them, or check
+          back once they&apos;re free.
+        </p>
+        <Button variant="outline" onClick={() => router.back()}>
+          Go back
+        </Button>
+      </div>
+    );
+  }
+
   if (done) {
     return (
       <div className="container max-w-lg py-12 text-center space-y-4">
