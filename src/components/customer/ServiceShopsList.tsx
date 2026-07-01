@@ -147,11 +147,18 @@ function ServiceCard({ shop, km }: { shop: Shop; km: number | null }) {
               {formatDistance(km)} away
             </div>
           )}
-          {shop.availableNow && (
-            <div className="inline-flex items-center gap-1 text-[11px] font-bold text-white bg-brand-green px-1.5 py-0.5 rounded">
-              <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
-              Available now
+          {shop.busy ? (
+            <div className="inline-flex items-center gap-1 text-[11px] font-bold text-white bg-[#b4741a] px-1.5 py-0.5 rounded">
+              <span className="h-1.5 w-1.5 rounded-full bg-white" />
+              Busy — on a job
             </div>
+          ) : (
+            shop.availableNow && (
+              <div className="inline-flex items-center gap-1 text-[11px] font-bold text-white bg-brand-green px-1.5 py-0.5 rounded">
+                <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
+                Available now
+              </div>
+            )
           )}
         </div>
 
@@ -219,14 +226,22 @@ function ServiceCard({ shop, km }: { shop: Shop; km: number | null }) {
           </a>
         </div>
 
-        {/* Book a service visit (no price — provider confirms a time). */}
-        <Link
-          href={`/customer/book/${shop._id}`}
-          className="inline-flex items-center justify-center gap-1.5 w-full h-9 mt-2 rounded-md bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 transition-colors"
-        >
-          <CalendarPlus className="h-4 w-4" />
-          Book service
-        </Link>
+        {/* Book a service visit (no price — provider confirms a time).
+            Hidden while the provider is on an active job, to avoid double-booking. */}
+        {shop.busy ? (
+          <div className="w-full h-9 mt-2 rounded-md bg-muted text-muted-foreground text-xs font-semibold flex items-center justify-center gap-1.5">
+            <CalendarPlus className="h-4 w-4" />
+            On a job — not taking bookings
+          </div>
+        ) : (
+          <Link
+            href={`/customer/book/${shop._id}`}
+            className="inline-flex items-center justify-center gap-1.5 w-full h-9 mt-2 rounded-md bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 transition-colors"
+          >
+            <CalendarPlus className="h-4 w-4" />
+            Book service
+          </Link>
+        )}
       </div>
     </Card>
   );
