@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Loader2,
   Phone,
@@ -67,6 +67,10 @@ export function BookingsTab() {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState('active');
   const [busyId, setBusyId] = useState<string | null>(null);
+  const busyIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    busyIdRef.current = busyId;
+  }, [busyId]);
 
   async function load() {
     setError(null);
@@ -80,6 +84,11 @@ export function BookingsTab() {
 
   useEffect(() => {
     load();
+    // Auto-refresh so new requests and status changes appear on their own.
+    const interval = setInterval(() => {
+      if (!document.hidden && !busyIdRef.current) load();
+    }, 15000);
+    return () => clearInterval(interval);
   }, []);
 
   async function act(id: string, update: BookingStatusUpdate) {
