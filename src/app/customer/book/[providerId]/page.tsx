@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import Link from 'next/link' ;
 import {
   Loader2,
@@ -19,6 +20,24 @@ import { ApiError } from '@/lib/api';
 import { fetchShop, type Shop } from '@/lib/shops';
 import { createBooking } from '@/lib/booking';
 import { useAuth } from '@/stores/auth';
+
+// Leaflet map — load client-side only (react-leaflet breaks during SSR).
+const LocationPicker = dynamic(() => import('@/components/shop/LocationPicker'), {
+  ssr: false,
+  loading: () => (
+    <div className="h-56 rounded-lg bg-muted animate-pulse flex items-center justify-center text-xs text-muted-foreground">
+      Loading map…
+    </div>
+  ),
+});
+
+type LatLng = { lat: number; lng: number };
+interface AddressHints {
+  line1?: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+}
 
 const TIME_SLOTS = [
   '8–10 AM',
@@ -64,6 +83,7 @@ export default function BookServicePage() {
   const [contactName, setContactName] = useState('');
   const [contactPhone, setContactPhone] = useState('');
   const [addressLine, setAddressLine] = useState('');
+  const [pin, setPin] = useState<LatLng | null>(null);
   const [notes, setNotes] = useState('');
 
   const [submitting, setSubmitting] = useState(false);
@@ -114,16 +134,16 @@ export default function BookServicePage() {
     setSubmitting(true);
     try {
       const firstAddr = user?.addresses?.[0];
-      await createBooking({
-        providerId: providerId!,
-        serviceName: serviceName.trim(),
-        requestNow: when === 'now',
-        scheduledDate: when === 'schedule' ? dateIso : undefined,
-        scheduledSlot: when === 'schedule' ? slot : undefined,
-        contactName: contactName.trim() || undefined,
-        contactPhone: contactPhone.trim() || undefined,
-        notes: notes.trim() || undefined,
-        address: firstAddr
+      // Prefer the map pin (most accurate). Fall back to saved, then typed.
+      const address = pin
+        ? {
+            line1: addressLine.trim() || firstAddr?.line1,
+            city: firstAddr?.city,
+            state: firstAddr?.state,
+            pincode: firstAddr?.pincode,
+            location: { lng: pin.lng, lat: pin.lat },
+          }
+        : firstAddr
           ? {
               label: firstAddr.label,
               line1: firstAddr.line1,
@@ -140,7 +160,18 @@ export default function BookServicePage() {
             }
           : addressLine.trim()
             ? { line1: addressLine.trim() }
-            : undefined,
+            : undefined;
+
+      await createBooking({
+        providerId: providerId!,
+        serviceName: serviceName.trim(),
+        requestNow: when === 'now',
+        scheduledDate: when === 'schedule' ? dateIso : undefined,
+        scheduledSlot: when === 'schedule' ? slot : undefined,
+        contactName: contactName.trim() || undefined,
+        contactPhone: contactPhone.trim() || undefined,
+        notes: notes.trim() || undefined,
+        address,
       });
       setDone(true);
     } catch (err) {
@@ -352,6 +383,30 @@ export default function BookServicePage() {
         {user?.addresses && user.addresses.length > 0 && (
           <p className="text-[11px] text-muted-foreground mt-1">
             Using your saved address. Edit it in My Profile.
+          </p>
+        )}
+      </div>
+
+      {/* Pin the exact spot on the map so the provider can navigate accurately. */}
+      <div>
+        <Label>Pin your location</Label>
+        <p className="text-[11px] text-muted-foreground mb-1.5">
+          Drag the pin to your exact spot so the provider can find you.
+        </p>
+        <LocationPicker
+          value={pin}
+          onChange={(v: LatLng, hints?: AddressHints) => {
+            setPin(v);
+            // Auto-fill the address text from the pin if it's still empty.
+            if (hints && !addressLine.trim()) {
+              const parts = [hints.line1, hints.city, hints.pincode].filter(Boolean);
+              if (parts.length) setAddressLine(parts.join(', '));
+            }
+          }}
+        />
+        {pin && (
+          <p className="text-[11px] text-muted-foreground mt-1">
+            Location pinned ✓ ({pin.lat.toFixed(5)}, {pin.lng.toFixed(5)})
           </p>
         )}
       </div>
