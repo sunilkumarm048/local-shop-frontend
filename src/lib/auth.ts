@@ -13,6 +13,15 @@ export async function loginWithEmail(email: string, password: string) {
   return res;
 }
 
+export async function loginWithGoogle(idToken: string) {
+  const res = await api<AuthResponse>('/auth/google', {
+    method: 'POST',
+    body: { idToken },
+  });
+  useAuth.getState().setAuth(res.user, res.token);
+  return res;
+}
+
 export async function registerWithEmail(input: {
   name?: string;
   email: string;
