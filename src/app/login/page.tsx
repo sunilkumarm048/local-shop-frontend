@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { loginWithEmail, sendOtp, verifyOtp } from '@/lib/auth';
 import { ApiError } from '@/lib/api';
+import { GoogleSignInButton } from '@/components/auth/GoogleSignInButton';
 
 type Mode = 'email' | 'phone';
 
@@ -112,6 +113,18 @@ export default function LoginPage() {
         </CardHeader>
 
         <CardContent className="space-y-4">
+          {/* Sign in with Google (only when configured) */}
+          {process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID && (
+            <>
+              <GoogleSignInButton />
+              <div className="flex items-center gap-3">
+                <div className="h-px flex-1 bg-border" />
+                <span className="text-xs text-muted-foreground">or</span>
+                <div className="h-px flex-1 bg-border" />
+              </div>
+            </>
+          )}
+
           {/* Mode toggle */}
           <div className="grid grid-cols-2 gap-2 p-1 bg-muted rounded-md">
             <button
