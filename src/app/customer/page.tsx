@@ -306,6 +306,27 @@ export default function CustomerHome() {
       .finally(() => setLoading(false));
   }, [lat, lng, activeCategory, searchTerm, serviceMode, radiusKm]);
 
+  /* ---------- Live refresh in Services mode ----------
+     Providers toggle "Available now" from their dashboard; poll quietly so the
+     badge updates on its own. No spinner — just swap in fresh data. Only runs
+     in services mode and when the tab is visible (saves the free-tier backend). */
+  useEffect(() => {
+    if (!serviceMode) return;
+    const interval = setInterval(() => {
+      if (document.hidden) return;
+      fetchNearbyShops({
+        lng: lng ?? undefined,
+        lat: lat ?? undefined,
+        radiusKm,
+        category: activeCategory || undefined,
+        q: searchTerm || undefined,
+      })
+        .then((r) => setShops(r.shops))
+        .catch(() => {});
+    }, 20000);
+    return () => clearInterval(interval);
+  }, [serviceMode, lat, lng, activeCategory, searchTerm, radiusKm]);
+
   /* ---------- Reset filters when group changes ---------- */
   useEffect(() => {
     setFilters(EMPTY_FILTERS);
