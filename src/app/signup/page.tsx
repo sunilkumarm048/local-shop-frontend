@@ -79,7 +79,7 @@ export default function SignupPage() {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-2">
           <CardTitle>Create an account</CardTitle>
-          <CardDescription>Choose how you&apos;ll use Local Shop.</CardDescription>
+          <CardDescription>Choose how you&apos;ll use Sarvopakar.</CardDescription>
         </CardHeader>
 
         <CardContent>
