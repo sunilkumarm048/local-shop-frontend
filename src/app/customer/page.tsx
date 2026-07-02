@@ -731,7 +731,7 @@ function ShopsStrip({
                   {shop.name}
                 </div>
                 <div className="text-[10px] text-muted-foreground truncate mt-0.5">
-                  {shop.description || 'Local Shop'}
+                  {shop.description || 'Sarvopakar'}
                 </div>
                 {shop.ratingCount > 0 ? (
                   <div className="flex items-center justify-center gap-0.5 mt-1 text-[10px] font-semibold text-[#8a6500]">
