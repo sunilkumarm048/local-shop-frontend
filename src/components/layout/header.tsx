@@ -68,7 +68,7 @@ export function Header() {
     <header className="sticky top-0 z-30 bg-gradient-to-r from-brand-yellow to-brand-yellowDark border-b border-black/10">
       <div className="container flex items-center justify-between h-14">
         <Link href="/customer" className="font-bold text-lg text-black">
-          Local Shop
+          Sarvopakar
         </Link>
 
         <div className="flex items-center gap-2">
@@ -109,7 +109,7 @@ export function Header() {
             >
               {/* Header strip */}
               <div className="px-4 py-3.5 bg-gradient-to-br from-brand-yellow to-brand-yellowDark text-black">
-                <div className="text-sm font-extrabold">Welcome to Local Shop 👋</div>
+                <div className="text-sm font-extrabold">Welcome to Sarvopakar 👋</div>
                 <div className="text-[11px] font-medium opacity-80">
                   Choose what you&apos;d like to do
                 </div>
