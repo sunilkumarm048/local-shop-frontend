@@ -148,6 +148,7 @@ export function DeliveryLocationModal({ open, onClose }: Props) {
   const [results, setResults] = useState<NominatimResult[]>([]);
   const [showResults, setShowResults] = useState(false);
   const [searching, setSearching] = useState(false);
+  const [satellite, setSatellite] = useState(true);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Re-sync from store every time the modal opens
@@ -466,11 +467,30 @@ export function DeliveryLocationModal({ open, onClose }: Props) {
                   style={{ height: '100%', width: '100%' }}
                   zoomControl
                 >
-                  <TileLayer
-                    attribution="© OpenStreetMap"
-                    url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-                    maxZoom={19}
-                  />
+                  {satellite ? (
+                    <>
+                      {/* Esri World Imagery — free satellite tiles, no API key. */}
+                      <TileLayer
+                        attribution="Tiles &copy; Esri"
+                        url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                        maxZoom={19}
+                      />
+                      {/* Transparent labels overlay — road/place names on top of
+                          imagery, so users can orient like on Google Maps. */}
+                      <TileLayer
+                        attribution="&copy; OpenStreetMap, &copy; CARTO"
+                        url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png"
+                        subdomains="abcd"
+                        maxZoom={20}
+                      />
+                    </>
+                  ) : (
+                    <TileLayer
+                      attribution="© OpenStreetMap"
+                      url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+                      maxZoom={19}
+                    />
+                  )}
                   <InvalidateOnMount />
                   <Recenter to={lat != null && lng != null ? [lat, lng] : null} />
                   <MapClickHandler onPick={pickFromMap} />
@@ -488,6 +508,14 @@ export function DeliveryLocationModal({ open, onClose }: Props) {
                     />
                   )}
                 </MapContainer>
+                {/* Map / Satellite toggle */}
+                <button
+                  type="button"
+                  onClick={() => setSatellite((s) => !s)}
+                  className="absolute top-2 right-2 z-[400] bg-white/95 hover:bg-white text-black text-[11px] font-semibold px-2.5 py-1 rounded-md shadow border border-black/10"
+                >
+                  {satellite ? 'Map view' : 'Satellite'}
+                </button>
                 <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-[400] bg-black/80 text-white text-[11px] font-semibold px-3 py-1 rounded-full pointer-events-none whitespace-nowrap">
                   Tap the map or drag the pin to set location
                 </div>
