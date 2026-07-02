@@ -19,7 +19,8 @@ import { useEffect, useRef, useState } from 'react';
 import { MapContainer, Marker, TileLayer, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Loader2, MapPin } from 'lucide-react';
+import { Loader2, MapPin, Search } from 'lucide-react';
+import { geoSearch, type GeoResult } from '@/lib/geo';
 
 // Leaflet default-icon shim — match the existing modal so a duplicate run is harmless.
 delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: unknown })._getIconUrl;
@@ -130,7 +131,45 @@ export function CheckoutLocationPicker({
 }: CheckoutLocationPickerProps) {
   const [resolving, setResolving] = useState(false);
   const [satellite, setSatellite] = useState(true);
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<GeoResult[]>([]);
+  const [showResults, setShowResults] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastFetchedRef = useRef<string>('');
+
+  // Address search (debounced 350ms) via backend proxy — Ola Maps (India) with
+  // OSM fallback. Selecting a result drops the pin there.
+  useEffect(() => {
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    const trimmed = query.trim();
+    if (trimmed.length < 3) {
+      setResults([]);
+      setShowResults(false);
+      return;
+    }
+    searchDebounceRef.current = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const found = await geoSearch(trimmed);
+        setResults(found);
+        setShowResults(true);
+      } catch {
+        setResults([]);
+      } finally {
+        setSearching(false);
+      }
+    }, 350);
+    return () => {
+      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    };
+  }, [query]);
+
+  const pickFromSearch = (r: GeoResult) => {
+    setQuery(r.name || r.address);
+    setShowResults(false);
+    onChange({ lat: r.lat, lng: r.lng, address: r.address || r.name, areaName: r.name || '' });
+  };
 
   // Whenever lat/lng change (parent-driven or our own onChange), do a
   // lightweight reverse-geocode and bubble the address back up. Throttled
@@ -158,6 +197,64 @@ export function CheckoutLocationPicker({
 
   return (
     <div className="border rounded-lg overflow-hidden bg-muted">
+      {/* Address search */}
+      <div className="relative border-b bg-white">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          type="text"
+          placeholder="Search address, area, landmark…"
+          className="w-full pl-9 pr-9 py-2.5 text-[13px] font-medium bg-transparent outline-none"
+        />
+        {searching && (
+          <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-primary" />
+        )}
+        {query && !searching && (
+          <button
+            type="button"
+            onClick={() => {
+              setQuery('');
+              setResults([]);
+              setShowResults(false);
+            }}
+            className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-muted text-muted-foreground flex items-center justify-center text-xs"
+          >
+            ×
+          </button>
+        )}
+      </div>
+
+      {/* Search results */}
+      {showResults && (
+        <div className="max-h-44 overflow-y-auto bg-white border-b">
+          {results.length === 0 ? (
+            <div className="px-3 py-3 text-center text-xs text-muted-foreground">
+              No results
+            </div>
+          ) : (
+            results.map((r, i) => (
+              <button
+                type="button"
+                key={`${r.lat},${r.lng},${i}`}
+                onClick={() => pickFromSearch(r)}
+                className="w-full text-left px-3 py-2.5 border-b last:border-0 flex gap-2.5 hover:bg-muted/50"
+              >
+                <MapPin className="h-3.5 w-3.5 shrink-0 mt-0.5 text-muted-foreground" />
+                <div className="min-w-0 flex-1 leading-tight">
+                  <div className="text-[13px] font-semibold truncate">
+                    {r.name || r.address?.split(',')[0]}
+                  </div>
+                  <div className="text-[11px] text-muted-foreground truncate">
+                    {r.address}
+                  </div>
+                </div>
+              </button>
+            ))
+          )}
+        </div>
+      )}
+
       <div className="relative h-56 w-full">
         <MapContainer
           center={center}
