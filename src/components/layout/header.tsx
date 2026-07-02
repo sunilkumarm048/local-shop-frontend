@@ -67,8 +67,22 @@ export function Header() {
   return (
     <header className="sticky top-0 z-30 bg-gradient-to-r from-brand-yellow to-brand-yellowDark border-b border-black/10">
       <div className="container flex items-center justify-between h-14">
-        <Link href="/customer" className="font-bold text-lg text-black">
-          Sarvopakar
+        <Link
+          href="/customer"
+          className="group relative inline-grid font-bold text-lg text-black leading-none"
+          aria-label="Sarvopakar"
+        >
+          {/* English — visible by default, fades/lifts out on hover */}
+          <span className="col-start-1 row-start-1 transition-all duration-300 ease-out group-hover:opacity-0 group-hover:-translate-y-1">
+            Sarvopakar
+          </span>
+          {/* Hindi — hidden by default, fades/settles in on hover */}
+          <span
+            className="col-start-1 row-start-1 opacity-0 translate-y-1 transition-all duration-300 ease-out group-hover:opacity-100 group-hover:translate-y-0"
+            aria-hidden="true"
+          >
+            सर्वोपकार
+          </span>
         </Link>
 
         <div className="flex items-center gap-2">
