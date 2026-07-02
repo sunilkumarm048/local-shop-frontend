@@ -12,11 +12,11 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   metadataBase: new URL(
-    process.env.NEXT_PUBLIC_SITE_URL || 'https://local-shop-frontend.vercel.app'
+    process.env.NEXT_PUBLIC_SITE_URL || 'https://www.sarvopakar.com'
   ),
   title: {
-    default: 'Local Shop — shops & services near you',
-    template: '%s · Local Shop',
+    default: 'Sarvopakar — shops & services near you',
+    template: '%s · Sarvopakar',
   },
   description:
     'Hyperlocal grocery + transport — order from shops nearby or book a vehicle to move anything.',
@@ -26,7 +26,7 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    title: 'Local Shop',
+    title: 'Sarvopakar',
     statusBarStyle: 'default',
   },
 };
