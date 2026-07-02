@@ -42,12 +42,26 @@ export function ServiceCategoryPicker({
           <button
             key={c._id}
             onClick={() => onPick(c._id)}
-            className="flex flex-col items-center justify-center gap-2 rounded-xl border border-border bg-card p-4 hover:border-primary/50 hover:bg-[#f0fbf2] transition aspect-square text-center"
+            className="group flex flex-col items-center gap-2 rounded-xl border border-border bg-card overflow-hidden hover:border-primary/50 hover:shadow-md transition text-center"
           >
-            <span className="text-3xl leading-none">
-              {c.icon || <Scissors className="h-7 w-7 text-primary" />}
-            </span>
-            <span className="text-[13px] font-semibold leading-tight line-clamp-2">
+            {/* Image thumbnail — HD Cloudinary banner when available, else the
+                emoji, else a default icon. */}
+            <div className="w-full aspect-[4/3] bg-muted flex items-center justify-center overflow-hidden">
+              {c.image ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={c.image}
+                  alt={c.name}
+                  loading="lazy"
+                  className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
+                />
+              ) : c.icon ? (
+                <span className="text-4xl leading-none">{c.icon}</span>
+              ) : (
+                <Scissors className="h-8 w-8 text-primary" />
+              )}
+            </div>
+            <span className="text-[13px] font-semibold leading-tight line-clamp-2 px-2 pb-3">
               {c.name}
             </span>
           </button>
