@@ -1,6 +1,6 @@
 {
-  "name": "Local Shop",
-  "short_name": "Local Shop",
+  "name": "Sarvopakar",
+  "short_name": "Sarvopakar",
   "description": "Hyperlocal grocery + transport — order from shops nearby or book a vehicle to move anything.",
   "start_url": "/",
   "scope": "/",
