@@ -265,7 +265,7 @@ export default function LoginPage() {
           )}
 
           <p className="text-center text-sm text-muted-foreground pt-2">
-            New to Local Shop?{' '}
+            New to Sarvopakar?{' '}
             <Link href="/signup" className="text-primary font-medium hover:underline">
               Create an account
             </Link>
