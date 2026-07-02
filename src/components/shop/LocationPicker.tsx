@@ -506,7 +506,7 @@ export default function LocationPicker({ value, onChange, defaultCenter }: Props
         </div>
 
         {showResults && results.length > 0 && (
-          <div className="absolute z-[1000] mt-1 w-full bg-popover border rounded-md shadow-lg max-h-64 overflow-y-auto">
+          <div className="absolute z-[1200] mt-1 w-full bg-white text-popover-foreground border rounded-md shadow-lg max-h-64 overflow-y-auto">
             {results.map((r, i) => {
               const display = r.display_name || '';
               const [main, ...rest] = display.split(', ');
@@ -528,7 +528,7 @@ export default function LocationPicker({ value, onChange, defaultCenter }: Props
           </div>
         )}
         {showResults && !searching && results.length === 0 && query.trim().length >= 3 && (
-          <div className="absolute z-[1000] mt-1 w-full bg-popover border rounded-md shadow-lg px-3 py-3 text-sm text-muted-foreground text-center">
+          <div className="absolute z-[1200] mt-1 w-full bg-white border rounded-md shadow-lg px-3 py-3 text-sm text-muted-foreground text-center">
             No results
           </div>
         )}
