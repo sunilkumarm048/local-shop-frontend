@@ -31,7 +31,7 @@ async function getShop(id: string) {
 
 /**
  * Per-shop SEO metadata. This is what makes the page rank for and display as
- * "<Shop> — <Category> in <City>" instead of the generic "Local Shop" title.
+ * "<Shop> — <Category> in <City>" instead of the generic "Sarvopakar" title.
  * Runs on the server, so Google's crawler sees it.
  */
 export async function generateMetadata({
@@ -42,8 +42,8 @@ export async function generateMetadata({
 
   if (!shop) {
     return {
-      title: 'Shop — Local Shop',
-      description: 'Discover local shops and services near you on Local Shop.',
+      title: 'Shop — Sarvopakar',
+      description: 'Discover local shops and services near you on Sarvopakar.',
     };
   }
 
@@ -55,7 +55,7 @@ export async function generateMetadata({
     : shop.name;
   const description =
     shop.description ||
-    `${shop.name}${locationBit ? ` in ${locationBit}` : ''}. View details, photos, ratings and contact on Local Shop.`;
+    `${shop.name}${locationBit ? ` in ${locationBit}` : ''}. View details, photos, ratings and contact on Sarvopakar.`;
 
   const image = shop.coverImage || shop.logo || undefined;
 
