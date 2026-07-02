@@ -33,8 +33,9 @@ export default function LandingPage() {
               Delivery in 15 minutes
             </div>
 
-            <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight text-black leading-[1.05]">
-              Local <span className="text-white drop-shadow-sm">Shop</span>
+            <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight text-white drop-shadow-sm leading-[1.05]">
+              Sarvopakar
+              <span className="block text-2xl sm:text-3xl font-bold mt-1">सर्वोपकार</span>
             </h1>
 
             <p className="text-base sm:text-lg text-black/75 max-w-md mx-auto">
@@ -90,7 +91,7 @@ export default function LandingPage() {
       <section className="container py-12 sm:py-16">
         <div className="max-w-3xl mx-auto text-center mb-6 sm:mb-8">
           <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-            Join Local Shop
+            Join Sarvopakar
           </h2>
           <p className="text-sm text-muted-foreground mt-1.5">
             Whether you&apos;re here to buy, sell, or deliver — we&apos;ve got you.
@@ -129,8 +130,8 @@ export default function LandingPage() {
       <footer className="mt-auto border-t bg-card">
         <div className="container py-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-muted-foreground">
           <div className="font-semibold">
-            <span className="text-foreground">Local</span>
-            <span className="text-brand-green">Shop</span>
+            <span className="text-foreground">Sarvo</span>
+            <span className="text-brand-green">pakar</span>
             <span className="ml-2 font-normal">— made for neighbourhoods.</span>
           </div>
           <div className="flex items-center gap-4">
