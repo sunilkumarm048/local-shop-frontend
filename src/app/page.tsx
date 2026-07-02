@@ -3,7 +3,7 @@ import {
   ShoppingBag,
   Store,
   Truck,
-  ShieldCheck,
+  Wrench,
   Zap,
   MapPin,
   Wallet,
@@ -51,6 +51,13 @@ export default function LandingPage() {
                 <ShoppingBag className="h-4 w-4" />
                 Start shopping
                 <ArrowRight className="h-4 w-4" />
+              </Link>
+              <Link
+                href="/customer?mode=services"
+                className="inline-flex items-center justify-center gap-2 bg-white/90 backdrop-blur text-black font-bold text-base px-6 py-3.5 rounded-full border border-black/10 shadow-lg shadow-black/5 hover:bg-white active:scale-[0.98] transition"
+              >
+                <Wrench className="h-4 w-4" />
+                Book a service
               </Link>
               <Link
                 href="/login"
@@ -116,12 +123,12 @@ export default function LandingPage() {
             cta="Start earning"
           />
           <RoleCard
-            href="/admin"
-            icon={<ShieldCheck className="h-6 w-6" />}
+            href="/customer?mode=services"
+            icon={<Wrench className="h-6 w-6" />}
             iconBg="bg-[#e8d6f7] text-[#6b3aa0]"
-            title="Admin"
-            subtitle="Manage shops, categories, pricing and approvals."
-            cta="Open admin"
+            title="Book a service"
+            subtitle="Plumbers, salons, AC repair, garages and more — near you."
+            cta="Explore services"
           />
         </div>
       </section>
@@ -142,7 +149,7 @@ export default function LandingPage() {
               Sign in
             </Link>
             <a
-              href="mailto:support@localshop.com"
+              href="mailto:support@sarvopakar.com"
               className="hover:text-foreground transition"
             >
               Support
