@@ -171,7 +171,7 @@ function InstallBanner({
         🏪
       </div>
       <div className="flex-1 min-w-0">
-        <div className="font-semibold text-sm">Install Local Shop</div>
+        <div className="font-semibold text-sm">Install Sarvopakar</div>
         <div className="text-xs text-muted-foreground">
           Add to your home screen for fast access.
         </div>
@@ -204,7 +204,7 @@ function IosInstructionCard({ onDismiss }: { onDismiss: () => void }) {
           🏪
         </div>
         <div className="flex-1 min-w-0">
-          <div className="font-semibold text-sm">Install Local Shop</div>
+          <div className="font-semibold text-sm">Install Sarvopakar</div>
           <div className="text-xs text-muted-foreground mt-1 leading-relaxed">
             Tap <Share className="inline h-3.5 w-3.5 align-text-bottom" /> below, then choose{' '}
             <span className="inline-flex items-center gap-0.5 font-medium">
