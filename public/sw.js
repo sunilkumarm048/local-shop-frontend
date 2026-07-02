@@ -1,6 +1,6 @@
 /* eslint-disable no-restricted-globals */
 /**
- * Local Shop service worker.
+ * Sarvopakar service worker.
  *
  * Strategies:
  *   - Navigation requests (HTML): network-first, fall back to offline.html.
@@ -125,10 +125,10 @@ self.addEventListener('push', (event) => {
     data = event.data ? event.data.json() : {};
   } catch {
     // Non-JSON payload — fall back to plain text body.
-    data = { title: 'Local Shop', body: event.data ? event.data.text() : '' };
+    data = { title: 'Sarvopakar', body: event.data ? event.data.text() : '' };
   }
 
-  const title = data.title || 'Local Shop';
+  const title = data.title || 'Sarvopakar';
   const options = {
     body: data.body || '',
     tag: data.tag || undefined, // same tag replaces an existing notification
