@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Minus, Plus, Search, ShoppingCart, Zap, ImageIcon, Star, Store, Wrench } from 'lucide-react';
 
@@ -216,6 +216,22 @@ export default function CustomerHome() {
   useEffect(() => {
     setRadiusKm(serviceMode ? SERVICE_RADIUS_KM : 5);
   }, [serviceMode]);
+
+  // Deep-link support: /customer?mode=services opens the Services tab directly
+  // (e.g. from the landing-page "Book a service" card). Fires once, after the
+  // category tree has loaded so servicesGroupNode is available.
+  const appliedModeParamRef = useRef(false);
+  useEffect(() => {
+    if (appliedModeParamRef.current) return;
+    if (!servicesGroupNode) return;
+    if (typeof window === 'undefined') return;
+    const wanted = new URLSearchParams(window.location.search).get('mode');
+    if (wanted === 'services') {
+      switchMode('services');
+    }
+    appliedModeParamRef.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [servicesGroupNode]);
 
   /* ---------- First-load silent GPS + reverse-geocode ---------- */
   useEffect(() => {
