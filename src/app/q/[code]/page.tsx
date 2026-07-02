@@ -86,14 +86,14 @@ export default function QrRedirectPage({ params }: PageProps) {
             <MapPin className="h-10 w-10 mx-auto text-primary" />
             <h1 className="mt-4 text-xl font-bold">Coming soon!</h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              This shop isn&apos;t set up on Local Shop yet. Check back soon — or
+              This shop isn&apos;t set up on Sarvopakar yet. Check back soon — or
               explore other shops near you.
             </p>
             <Link
               href="/customer"
               className="inline-block mt-5 rounded-lg bg-primary text-primary-foreground px-5 py-2.5 text-sm font-semibold"
             >
-              Explore Local Shop
+              Explore Sarvopakar
             </Link>
           </>
         )}
@@ -109,7 +109,7 @@ export default function QrRedirectPage({ params }: PageProps) {
               href="/customer"
               className="inline-block mt-5 rounded-lg bg-primary text-primary-foreground px-5 py-2.5 text-sm font-semibold"
             >
-              Go to Local Shop
+              Go to Sarvopakar
             </Link>
           </>
         )}
@@ -124,7 +124,7 @@ export default function QrRedirectPage({ params }: PageProps) {
               href="/customer"
               className="inline-block mt-5 rounded-lg bg-primary text-primary-foreground px-5 py-2.5 text-sm font-semibold"
             >
-              Go to Local Shop
+              Go to Sarvopakar
             </Link>
           </>
         )}
