@@ -177,7 +177,7 @@ export default function CheckoutPage() {
         key: result.payment.razorpayKeyId,
         amount: result.payment.amount,
         currency: result.payment.currency,
-        name: 'Local Shop',
+        name: 'Sarvopakar',
         description: `${result.orders.length} order(s)`,
         order_id: result.payment.razorpayOrderId,
         prefill: {
