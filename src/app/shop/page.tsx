@@ -1,9 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import Link from 'next/link';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, LogOut, Package, Store, ListOrdered, TrendingUp, PackagePlus, CalendarCheck } from 'lucide-react';
+import { Loader2, LogOut, Package, Store, ListOrdered, TrendingUp, PackagePlus, CalendarCheck, User as UserIcon, ChevronDown } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/stores/auth';
@@ -113,6 +112,8 @@ export default function ShopDashboard() {
       <ShopHeader
         shop={shop}
         userName={user.name}
+        currentSection={section}
+        onSelectSection={setSection}
         onShopUpdated={(s) => setShops((prev) => (prev ? [s, ...prev.slice(1)] : [s]))}
         onLogout={async () => {
           await logout();
@@ -149,13 +150,36 @@ export default function ShopDashboard() {
 interface HeaderProps {
   shop: Shop;
   userName?: string;
+  currentSection: Section;
+  onSelectSection: (s: Section) => void;
   onShopUpdated: (s: Shop) => void;
   onLogout: () => void;
 }
 
-function ShopHeader({ shop, userName, onShopUpdated, onLogout }: HeaderProps) {
+function ShopHeader({ shop, userName, currentSection, onSelectSection, onShopUpdated, onLogout }: HeaderProps) {
   const [toggling, setToggling] = useState(false);
   const [toggleError, setToggleError] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Close the profile dropdown on outside-click / Escape.
+  useEffect(() => {
+    if (!menuOpen) return;
+    function onDoc(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setMenuOpen(false);
+    }
+    document.addEventListener('mousedown', onDoc);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDoc);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [menuOpen]);
 
   async function toggleOpen() {
     setToggling(true);
@@ -186,27 +210,21 @@ function ShopHeader({ shop, userName, onShopUpdated, onLogout }: HeaderProps) {
 
   return (
     <header className="sticky top-0 z-30 bg-gradient-to-b from-brand-yellow to-brand-yellowDark border-b border-black/10 shadow-sm">
-      <div className="container flex items-center gap-3 py-3">
-        <Link href="/" className="h-11 w-11 rounded-full bg-white flex items-center justify-center text-xl shadow-sm shrink-0">
-          {shop.logo ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={shop.logo} alt="" className="h-full w-full rounded-full object-cover" />
-          ) : (
-            '🏪'
-          )}
-        </Link>
-
+      <div className="container flex items-center gap-2 py-2.5">
+        {/* Brand name (compact) */}
         <div className="flex-1 min-w-0 leading-tight">
-          {userName && <div className="text-xs text-black/70 font-medium">Hi, {userName}</div>}
-          <div className="text-base font-bold text-black truncate">{shop.name}</div>
+          <div className="text-base sm:text-lg font-extrabold text-black truncate">
+            Sarvopakar
+          </div>
         </div>
 
+        {/* Open/Closed toggle — icon-compact on mobile, labelled on sm+ */}
         <button
           type="button"
           onClick={toggleOpen}
           disabled={toggling}
           aria-label={shop.isOpen ? 'Close shop' : 'Open shop'}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold shrink-0 transition-colors ${
+          className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full text-xs font-bold shrink-0 transition-colors ${
             shop.isOpen
               ? 'bg-white/60 hover:bg-white/80 text-black'
               : 'bg-white/90 hover:bg-white text-[#c41818]'
@@ -215,20 +233,19 @@ function ShopHeader({ shop, userName, onShopUpdated, onLogout }: HeaderProps) {
           {toggling ? (
             <Loader2 className="h-3 w-3 animate-spin" />
           ) : (
-            <span
-              className={`h-2 w-2 rounded-full ${shop.isOpen ? 'bg-brand-green' : 'bg-[#d23030]'}`}
-            />
+            <span className={`h-2 w-2 rounded-full ${shop.isOpen ? 'bg-brand-green' : 'bg-[#d23030]'}`} />
           )}
           {shop.isOpen ? 'OPEN' : 'CLOSED'}
         </button>
 
+        {/* Available toggle (service providers only) */}
         {shop.isService && (
           <button
             type="button"
             onClick={toggleAvailable}
             disabled={togglingAvail}
             aria-label={shop.availableNow ? 'Go offline' : 'Go available'}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold shrink-0 transition-colors ${
+            className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full text-xs font-bold shrink-0 transition-colors ${
               shop.availableNow
                 ? 'bg-brand-green text-white hover:bg-brand-green/90'
                 : 'bg-white/70 hover:bg-white text-black'
@@ -237,25 +254,67 @@ function ShopHeader({ shop, userName, onShopUpdated, onLogout }: HeaderProps) {
             {togglingAvail ? (
               <Loader2 className="h-3 w-3 animate-spin" />
             ) : (
-              <span
-                className={`h-2 w-2 rounded-full ${
-                  shop.availableNow ? 'bg-white' : 'bg-muted-foreground'
-                }`}
-              />
+              <span className={`h-2 w-2 rounded-full ${shop.availableNow ? 'bg-white' : 'bg-muted-foreground'}`} />
             )}
             {shop.availableNow ? 'AVAILABLE' : 'UNAVAILABLE'}
           </button>
         )}
 
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="Logout"
-          onClick={onLogout}
-          className="text-black hover:bg-black/10"
-        >
-          <LogOut className="h-5 w-5" />
-        </Button>
+        {/* Profile dropdown — avatar button opens Storefront/Profile + Logout */}
+        <div className="relative shrink-0" ref={menuRef}>
+          <button
+            type="button"
+            onClick={() => setMenuOpen((v) => !v)}
+            aria-label="Profile menu"
+            aria-expanded={menuOpen}
+            className="flex items-center gap-1 rounded-full bg-white/70 hover:bg-white h-9 pl-1 pr-1.5 transition-colors"
+          >
+            <span className="h-7 w-7 rounded-full bg-white flex items-center justify-center overflow-hidden shrink-0">
+              {shop.logo ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={shop.logo} alt="" className="h-full w-full rounded-full object-cover" />
+              ) : (
+                <UserIcon className="h-4 w-4 text-black/70" />
+              )}
+            </span>
+            <ChevronDown className="h-3.5 w-3.5 text-black/70" />
+          </button>
+
+          {menuOpen && (
+            <div className="absolute right-0 mt-2 w-56 rounded-xl bg-white shadow-lg border border-black/10 overflow-hidden z-[400]">
+              <div className="px-3 py-2.5 border-b bg-muted/40">
+                {userName && (
+                  <div className="text-[11px] text-muted-foreground">Hi, {userName}</div>
+                )}
+                <div className="text-sm font-bold truncate">{shop.name}</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  onSelectSection('storefront');
+                  setMenuOpen(false);
+                }}
+                className={`w-full text-left px-3 py-2.5 text-sm flex items-center gap-2 hover:bg-muted ${
+                  currentSection === 'storefront' ? 'text-primary font-semibold' : ''
+                }`}
+              >
+                <Store className="h-4 w-4" />
+                Storefront / Profile
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onLogout();
+                }}
+                className="w-full text-left px-3 py-2.5 text-sm flex items-center gap-2 hover:bg-muted text-destructive border-t"
+              >
+                <LogOut className="h-4 w-4" />
+                Logout
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Banner when closed — same intent as the legacy closedBanner */}
@@ -288,7 +347,6 @@ interface NavProps {
 
 function SectionNav({ current, onChange, isService }: NavProps) {
   const allItems: Array<{ id: Section; label: string; icon: typeof Store }> = [
-    { id: 'storefront', label: 'Storefront', icon: Store },
     { id: 'products', label: 'Products', icon: Package },
     { id: 'catalog', label: 'Catalog', icon: PackagePlus },
     { id: 'bookings', label: 'Bookings', icon: CalendarCheck },
@@ -303,7 +361,7 @@ function SectionNav({ current, onChange, isService }: NavProps) {
     return it.id !== 'bookings';
   });
   return (
-    <nav className="flex gap-1 border-b">
+    <nav className="flex gap-1 border-b overflow-x-auto">
       {items.map(({ id, label, icon: Icon }) => {
         const active = current === id;
         return (
@@ -311,7 +369,7 @@ function SectionNav({ current, onChange, isService }: NavProps) {
             key={id}
             type="button"
             onClick={() => onChange(id)}
-            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap shrink-0 ${
               active
                 ? 'border-primary text-foreground'
                 : 'border-transparent text-muted-foreground hover:text-foreground'
