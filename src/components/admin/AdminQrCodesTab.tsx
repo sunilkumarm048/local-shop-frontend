@@ -195,19 +195,19 @@ export default function AdminQrCodesTab() {
     ctx.fillStyle = '#ffffff';
     ctx.fillText(pillText, center, 175);
 
-    // "Now on Sarvopakar"
+    // "Now on Sarvopakar" — extra gap below the yellow header for breathing room.
     ctx.fillStyle = '#9a9a90';
     ctx.font = '500 20px sans-serif';
-    ctx.fillText('NOW ON SARVOPAKAR', center, 262);
+    ctx.fillText('NOW ON SARVOPAKAR', center, 296);
 
     // Shop / provider name (or code fallback)
     ctx.fillStyle = '#1a1a1a';
-    ctx.font = '500 42px sans-serif';
+    ctx.font = '500 44px sans-serif';
     const shopName = qrRow.shopName || `Code ${qrRow.code}`;
-    ctx.fillText(shopName, center, 312);
+    ctx.fillText(shopName, center, 352);
 
     // Location line (e.g. "Narendrapur, Nemalo") with a map-pin marker.
-    let qrTop = 380;
+    let qrTop = 448;
     if (qrRow.shopLocation) {
       ctx.font = '400 24px sans-serif';
       const textW = ctx.measureText(qrRow.shopLocation).width;
@@ -215,13 +215,13 @@ export default function AdminQrCodesTab() {
       const groupW = textW + pinGap;
       const startX = center - groupW / 2;
       // Pin sits at the left of the group.
-      drawPin(ctx, startX + 8, 340, '#0C831F');
+      drawPin(ctx, startX + 8, 386, '#0C831F');
       // Text starts after the pin (left-aligned within the group).
       ctx.fillStyle = '#6a6a62';
       ctx.textAlign = 'left';
-      ctx.fillText(qrRow.shopLocation, startX + pinGap, 348);
+      ctx.fillText(qrRow.shopLocation, startX + pinGap, 394);
       ctx.textAlign = 'center'; // restore for the rest of the flyer
-      qrTop = 400;
+      qrTop = 448;
     }
 
     // QR — large and borderless. Sized to leave clear room for the caption
