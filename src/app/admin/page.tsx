@@ -10,6 +10,7 @@ import {
   Store,
   Users,
   ListOrdered,
+  Wrench,
   Tags,
   Shield,
   IndianRupee,
@@ -31,6 +32,7 @@ import { AdminShopsTab } from '@/components/admin/AdminShopsTab';
 import AdminQuickAddShopTab from '@/components/admin/AdminQuickAddShopTab';
 import { AdminUsersTab } from '@/components/admin/AdminUsersTab';
 import { AdminOrdersTab } from '@/components/admin/AdminOrdersTab';
+import { AdminBookingsTab } from '@/components/admin/AdminBookingsTab';
 import { AdminCategoriesTab } from '@/components/admin/AdminCategoriesTab';
 import AdminPricingTab from '@/components/admin/AdminPricingTab';
 import AdminWithdrawalsTab from '@/components/admin/AdminWithdrawalsTab';
@@ -46,6 +48,7 @@ type Section =
   | 'quickadd'
   | 'users'
   | 'orders'
+  | 'bookings'
   | 'categories'
   | 'pricing'
   | 'withdrawals'
@@ -121,6 +124,7 @@ export default function AdminDashboard() {
           {section === 'quickadd' && <AdminQuickAddShopTab />}
           {section === 'users' && <AdminUsersTab currentUserId={user.id} />}
           {section === 'orders' && <AdminOrdersTab />}
+          {section === 'bookings' && <AdminBookingsTab />}
           {section === 'categories' && <AdminCategoriesTab />}
           {section === 'pricing' && <AdminPricingTab />}
           {section === 'withdrawals' && <AdminWithdrawalsTab />}
@@ -147,6 +151,7 @@ function SectionNav({ current, onChange }: NavProps) {
     { id: 'quickadd', label: 'Quick Add Shop', icon: PackagePlus },
     { id: 'users', label: 'Users', icon: Users },
     { id: 'orders', label: 'Orders', icon: ListOrdered },
+    { id: 'bookings', label: 'Service Orders', icon: Wrench },
     { id: 'categories', label: 'Categories', icon: Tags },
     { id: 'pricing', label: 'Pricing', icon: IndianRupee },
     { id: 'discounts', label: 'Discounts', icon: Percent },
