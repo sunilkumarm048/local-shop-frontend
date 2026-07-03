@@ -61,6 +61,19 @@ export default function ShopDashboard() {
       );
   }, [user]);
 
+  // Pick the most useful landing section once the shop loads. Service providers
+  // care about incoming bookings, so they land on Bookings rather than the
+  // Storefront/profile. Applied once (guarded) so it doesn't fight manual nav.
+  const defaultSectionAppliedRef = useRef(false);
+  useEffect(() => {
+    if (defaultSectionAppliedRef.current) return;
+    if (!shops || shops.length === 0) return;
+    if (shops[0].isService) {
+      setSection('bookings');
+    }
+    defaultSectionAppliedRef.current = true;
+  }, [shops]);
+
   // ---- Loading / gating states ----
 
   if (!hydrated) {
