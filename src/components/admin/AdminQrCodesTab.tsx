@@ -161,8 +161,8 @@ export default function AdminQrCodesTab() {
     ctx.font = '500 58px sans-serif';
     ctx.fillText('सर्वोपकार', center, 122);
 
-    // Delivery pill
-    const pillText = 'Delivery in 15 minutes';
+    // Tagline pill — neutral so it fits both shops and service providers.
+    const pillText = 'Shop  ·  Services  ·  Nearby';
     ctx.font = '500 20px sans-serif';
     const pillW = ctx.measureText(pillText).width + 60;
     const pillX = center - pillW / 2;
@@ -175,18 +175,27 @@ export default function AdminQrCodesTab() {
     // "Now on Sarvopakar"
     ctx.fillStyle = '#9a9a90';
     ctx.font = '500 20px sans-serif';
-    ctx.fillText('NOW ON SARVOPAKAR', center, 268);
+    ctx.fillText('NOW ON SARVOPAKAR', center, 262);
 
-    // Shop name (or code fallback)
+    // Shop / provider name (or code fallback)
     ctx.fillStyle = '#1a1a1a';
     ctx.font = '500 42px sans-serif';
     const shopName = qrRow.shopName || `Code ${qrRow.code}`;
-    ctx.fillText(shopName, center, 320);
+    ctx.fillText(shopName, center, 312);
+
+    // Location line (e.g. "Narendrapur, Nemalo") when available.
+    let qrTop = 380;
+    if (qrRow.shopLocation) {
+      ctx.fillStyle = '#6a6a62';
+      ctx.font = '400 24px sans-serif';
+      ctx.fillText(qrRow.shopLocation, center, 348);
+      qrTop = 400;
+    }
 
     // QR in green frame
     const qrSize = 360;
     const qrX = center - qrSize / 2;
-    const qrY = 380;
+    const qrY = qrTop;
     const pad = 20;
     ctx.strokeStyle = '#0C831F';
     ctx.lineWidth = 6;
@@ -208,7 +217,7 @@ export default function AdminQrCodesTab() {
     // Trust line
     ctx.fillStyle = '#6a6a62';
     ctx.font = '400 22px sans-serif';
-    ctx.fillText('Fast delivery   ·   Pay on delivery   ·   Local shop', center, H - 40);
+    ctx.fillText('Trusted local  ·  Pay your way  ·  Book or order', center, H - 40);
 
     const link = document.createElement('a');
     link.download = `sarvopakar-flyer-${qrRow.code}.png`;
