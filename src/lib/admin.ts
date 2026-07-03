@@ -428,6 +428,7 @@ export interface QrCodeRow {
   code: string;
   shopId: string | null;
   shopName: string | null;
+  shopLocation?: string | null;
   scans: number;
   note: string;
 }
