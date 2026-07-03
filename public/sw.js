@@ -125,10 +125,10 @@ self.addEventListener('push', (event) => {
     data = event.data ? event.data.json() : {};
   } catch {
     // Non-JSON payload — fall back to plain text body.
-    data = { title: 'Sarvopakar', body: event.data ? event.data.text() : '' };
+    data = { title: 'सर्वोपकार', body: event.data ? event.data.text() : '' };
   }
 
-  const title = data.title || 'Sarvopakar';
+  const title = data.title || 'सर्वोपकार';
   const options = {
     body: data.body || '',
     tag: data.tag || undefined, // same tag replaces an existing notification
@@ -136,6 +136,8 @@ self.addEventListener('push', (event) => {
     icon: '/icons/icon-192.png',
     badge: '/icons/icon-192.png',
     renotify: Boolean(data.tag),
+    // Declaring our own action replaces Chrome's default "Unsubscribe" button.
+    actions: [{ action: 'open', title: 'View' }],
   };
 
   event.waitUntil(self.registration.showNotification(title, options));
