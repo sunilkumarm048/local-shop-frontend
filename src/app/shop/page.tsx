@@ -147,7 +147,7 @@ export default function ShopDashboard() {
           {section === 'products' && !shop.isService && <ProductsTab shopId={shop._id} />}
           {section === 'catalog' && !shop.isService && <CatalogTab shopId={shop._id} />}
           {section === 'orders' && <OrdersTab shopId={shop._id} />}
-          {section === 'bookings' && <BookingsTab />}
+          {section === 'bookings' && <BookingsTab shop={shop} />}
           {section === 'analytics' && <ShopAnalyticsTab />}
         </div>
       </main>
