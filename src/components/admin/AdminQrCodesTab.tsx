@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
-import { Loader2, QrCode as QrIcon, Link2, X, RefreshCw } from 'lucide-react';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { Loader2, QrCode as QrIcon, Link2, X, RefreshCw, Download } from 'lucide-react';
+import { QRCodeCanvas } from 'qrcode.react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,7 +18,7 @@ import {
 } from '@/lib/admin';
 
 const SITE =
-  process.env.NEXT_PUBLIC_SITE_URL || 'https://local-shop-frontend.vercel.app';
+  process.env.NEXT_PUBLIC_SITE_URL || 'https://www.sarvopakar.com';
 
 /**
  * Admin tab: QR-flyer management.
@@ -40,6 +41,10 @@ export default function AdminQrCodesTab() {
 
   // Approved shops, for the link dropdown.
   const [shops, setShops] = useState<AdminShop[]>([]);
+
+  // Which code's QR is being previewed (for the show/download modal).
+  const [qrCode, setQrCode] = useState<string | null>(null);
+  const qrCanvasRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -103,6 +108,16 @@ export default function AdminQrCodesTab() {
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Could not unlink code');
     }
+  }
+
+  // Download the currently-previewed QR as a PNG (finds the rendered <canvas>).
+  function downloadQr() {
+    const canvas = qrCanvasRef.current?.querySelector('canvas');
+    if (!canvas) return;
+    const link = document.createElement('a');
+    link.download = `sarvopakar-qr-${qrCode}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
   }
 
   return (
@@ -198,6 +213,13 @@ export default function AdminQrCodesTab() {
             >
               <span className="font-mono font-bold text-sm w-16">{r.code}</span>
 
+              <button
+                onClick={() => setQrCode(r.code)}
+                className="inline-flex items-center gap-1 text-xs font-semibold text-primary border border-primary/30 rounded px-2 py-1 hover:bg-primary/10"
+              >
+                <QrIcon className="h-3.5 w-3.5" /> QR
+              </button>
+
               {r.shopId ? (
                 <>
                   <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary bg-primary/10 px-2 py-1 rounded">
@@ -234,6 +256,45 @@ export default function AdminQrCodesTab() {
               )}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* QR preview + download modal */}
+      {qrCode && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setQrCode(null)}
+        >
+          <div
+            className="bg-white rounded-2xl p-6 w-full max-w-xs text-center relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setQrCode(null)}
+              className="absolute top-3 right-3 text-muted-foreground hover:text-foreground"
+              aria-label="Close"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <h3 className="font-bold text-lg mb-1">Code {qrCode}</h3>
+            <p className="text-xs text-muted-foreground mb-4 break-all">
+              {SITE}/q/{qrCode}
+            </p>
+            <div ref={qrCanvasRef} className="flex justify-center mb-4">
+              <QRCodeCanvas
+                value={`${SITE}/q/${qrCode}`}
+                size={220}
+                level="M"
+                includeMargin
+              />
+            </div>
+            <Button onClick={downloadQr} className="w-full">
+              <Download className="h-4 w-4 mr-1.5" /> Download PNG
+            </Button>
+            <p className="text-[11px] text-muted-foreground mt-2">
+              Print this on the flyer. Scanning opens the linked shop.
+            </p>
+          </div>
         </div>
       )}
     </div>
