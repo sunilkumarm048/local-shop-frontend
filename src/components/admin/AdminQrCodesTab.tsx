@@ -396,11 +396,43 @@ export default function AdminQrCodesTab() {
                     <option value="" disabled>
                       Link to shop…
                     </option>
-                    {shops.map((s) => (
-                      <option key={s._id} value={s._id}>
-                        {s.name}
-                      </option>
-                    ))}
+                    {(() => {
+                      // Shops/services already tied to a code shouldn't appear —
+                      // each shop links to at most one QR.
+                      const linkedIds = new Set(
+                        rows.map((row) => row.shopId).filter(Boolean)
+                      );
+                      const available = shops.filter((s) => !linkedIds.has(s._id));
+                      const svc = available.filter((s) => s.isService);
+                      const prod = available.filter((s) => !s.isService);
+                      return (
+                        <>
+                          {prod.length > 0 && (
+                            <optgroup label="Shops">
+                              {prod.map((s) => (
+                                <option key={s._id} value={s._id}>
+                                  {s.name}
+                                </option>
+                              ))}
+                            </optgroup>
+                          )}
+                          {svc.length > 0 && (
+                            <optgroup label="Services">
+                              {svc.map((s) => (
+                                <option key={s._id} value={s._id}>
+                                  {s.name}
+                                </option>
+                              ))}
+                            </optgroup>
+                          )}
+                          {available.length === 0 && (
+                            <option value="" disabled>
+                              All shops already linked
+                            </option>
+                          )}
+                        </>
+                      );
+                    })()}
                   </select>
                 </div>
               )}
