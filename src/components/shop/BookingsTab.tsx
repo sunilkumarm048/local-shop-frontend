@@ -65,7 +65,7 @@ const ACTIVE_STATUSES = ['accepted', 'scheduled', 'on_the_way', 'in_progress'];
 export function BookingsTab() {
   const [bookings, setBookings] = useState<Booking[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState('active');
+  const [filter, setFilter] = useState('requested');
   const [busyId, setBusyId] = useState<string | null>(null);
   const busyIdRef = useRef<string | null>(null);
   useEffect(() => {
@@ -99,6 +99,11 @@ export function BookingsTab() {
       setBookings((prev) =>
         prev ? prev.map((b) => (b._id === id ? { ...b, ...updated } : b)) : prev
       );
+      // When the provider accepts a new request, jump to the Active view so the
+      // job they just took is right in front of them (it leaves the New list).
+      if (update.status === 'accepted') {
+        setFilter('active');
+      }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not update the booking.');
     } finally {
