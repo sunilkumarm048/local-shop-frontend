@@ -16,6 +16,7 @@ import {
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ApiError } from '@/lib/api';
+import { playShopOrder, initNotificationSound } from '@/lib/notificationSound';
 import {
   fetchIncomingBookings,
   updateBookingStatus,
@@ -72,10 +73,23 @@ export function BookingsTab() {
     busyIdRef.current = busyId;
   }, [busyId]);
 
+  // Remember how many "new" (requested) bookings we last saw, so a poll that
+  // brings in more can ring the shop alert. Starts null so the first load
+  // (which may already contain requests) doesn't ring on page open.
+  const prevRequestedRef = useRef<number | null>(null);
+
   async function load() {
     setError(null);
     try {
       const list = await fetchIncomingBookings();
+      const requestedCount = list.filter((b) => b.status === 'requested').length;
+      if (
+        prevRequestedRef.current !== null &&
+        requestedCount > prevRequestedRef.current
+      ) {
+        playShopOrder();
+      }
+      prevRequestedRef.current = requestedCount;
       setBookings(list);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not load bookings.');
@@ -83,6 +97,7 @@ export function BookingsTab() {
   }
 
   useEffect(() => {
+    initNotificationSound();
     load();
     // Auto-refresh so new requests and status changes appear on their own.
     const interval = setInterval(() => {
@@ -222,7 +237,7 @@ function BookingCard({
             <p className="font-semibold text-sm">{booking.serviceName}</p>
             <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
               <User className="h-3 w-3" />
-              {cust?.name || booking.contactName || 'Customer'}
+              {booking.contactName || cust?.name || 'Customer'}
             </p>
           </div>
           <span
@@ -239,11 +254,11 @@ function BookingCard({
             {booking.requestNow ? <Clock className="h-3.5 w-3.5" /> : <Calendar className="h-3.5 w-3.5" />}
             {when}
           </p>
-          {(cust?.phone || booking.contactPhone) && (
+          {(booking.contactPhone || cust?.phone) && (
             <p className="flex items-center gap-1.5">
               <Phone className="h-3.5 w-3.5" />
-              <a href={`tel:${cust?.phone || booking.contactPhone}`} className="text-primary">
-                {cust?.phone || booking.contactPhone}
+              <a href={`tel:${booking.contactPhone || cust?.phone}`} className="text-primary">
+                {booking.contactPhone || cust?.phone}
               </a>
             </p>
           )}
