@@ -17,6 +17,33 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ApiError } from '@/lib/api';
 import { playShopOrder, initNotificationSound } from '@/lib/notificationSound';
+import type { Shop } from '@/lib/shops';
+
+/** Great-circle distance in km between two [lng, lat] points (haversine). */
+function distanceKm(
+  a: [number, number] | undefined,
+  b: [number, number] | undefined
+): number | null {
+  if (!a || !b) return null;
+  const [lng1, lat1] = a;
+  const [lng2, lat2] = b;
+  if ([lng1, lat1, lng2, lat2].some((n) => typeof n !== 'number' || Number.isNaN(n))) {
+    return null;
+  }
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const R = 6371; // km
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const s =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1 - s));
+}
+
+function formatDistance(km: number): string {
+  if (km < 1) return `${Math.round(km * 1000)} m away`;
+  return `${km.toFixed(1)} km away`;
+}
 import {
   fetchIncomingBookings,
   updateBookingStatus,
@@ -63,7 +90,7 @@ const FILTERS = [
 
 const ACTIVE_STATUSES = ['accepted', 'scheduled', 'on_the_way', 'in_progress'];
 
-export function BookingsTab() {
+export function BookingsTab({ shop }: { shop?: Shop }) {
   const [bookings, setBookings] = useState<Booking[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState('requested');
@@ -186,6 +213,7 @@ export function BookingsTab() {
               key={b._id}
               booking={b}
               busy={busyId === b._id}
+              shopCoords={shop?.location?.coordinates}
               onAct={(u) => act(b._id, u)}
             />
           ))}
@@ -198,10 +226,12 @@ export function BookingsTab() {
 function BookingCard({
   booking,
   busy,
+  shopCoords,
   onAct,
 }: {
   booking: Booking;
   busy: boolean;
+  shopCoords?: [number, number];
   onAct: (u: BookingStatusUpdate) => void;
 }) {
   const cust =
@@ -211,6 +241,7 @@ function BookingCard({
     ? [addr.line1, addr.line2, addr.city, addr.pincode].filter(Boolean).join(', ')
     : '';
   const coords = addr?.location?.coordinates;
+  const dist = distanceKm(shopCoords, coords);
   const directionsUrl = coords
     ? `https://www.google.com/maps/dir/?api=1&destination=${coords[1]},${coords[0]}&travelmode=driving`
     : addrLine
@@ -265,7 +296,20 @@ function BookingCard({
           {addrLine && (
             <p className="flex items-start gap-1.5">
               <MapPin className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-              <span>{addrLine}</span>
+              <span>
+                {addrLine}
+                {dist != null && (
+                  <span className="ml-1.5 inline-block font-semibold text-foreground">
+                    · {formatDistance(dist)}
+                  </span>
+                )}
+              </span>
+            </p>
+          )}
+          {!addrLine && dist != null && (
+            <p className="flex items-center gap-1.5">
+              <MapPin className="h-3.5 w-3.5 shrink-0" />
+              <span className="font-semibold text-foreground">{formatDistance(dist)}</span>
             </p>
           )}
           {booking.notes && (
