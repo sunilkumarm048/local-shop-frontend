@@ -224,33 +224,32 @@ export default function AdminQrCodesTab() {
       qrTop = 400;
     }
 
-    // QR in green frame — maximized to fill the sheet width for the longest
-    // possible scan distance on A4/A5 prints. Minimal side margin.
-    const pad = 14;
-    const qrSize = W - 2 * pad - 20; // near full-width
+    // QR — large and borderless. Sized to leave clear room for the caption
+    // lines below so nothing overlaps.
+    const sideMargin = 60;
+    const bottomTextH = 180;
+    const qrSize = Math.min(W - sideMargin * 2, H - qrTop - bottomTextH);
     const qrX = center - qrSize / 2;
     const qrY = qrTop;
-    ctx.strokeStyle = '#0C831F';
-    ctx.lineWidth = 6;
-    roundRect(ctx, qrX - pad, qrY - pad, qrSize + pad * 2, qrSize + pad * 2, 20);
-    ctx.stroke();
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(srcCanvas, qrX, qrY, qrSize, qrSize);
 
+    const belowQr = qrY + qrSize;
+
     // Scan cue
     ctx.fillStyle = '#0C831F';
-    ctx.font = '500 32px sans-serif';
-    ctx.fillText('Scan to order or book', center, qrY + qrSize + 66);
+    ctx.font = '500 34px sans-serif';
+    ctx.fillText('Scan to order or book', center, belowQr + 52);
 
     // URL chip
     ctx.fillStyle = '#8a8a80';
     ctx.font = '400 24px monospace';
-    ctx.fillText(`${SITE.replace(/^https?:\/\//, '')}/q/${qrRow.code}`, center, qrY + qrSize + 120);
+    ctx.fillText(`${SITE.replace(/^https?:\/\//, '')}/q/${qrRow.code}`, center, belowQr + 96);
 
     // Trust line
     ctx.fillStyle = '#6a6a62';
     ctx.font = '400 22px sans-serif';
-    ctx.fillText('Trusted local  ·  Pay your way  ·  Book or order', center, H - 40);
+    ctx.fillText('Trusted local  ·  Pay your way  ·  Book or order', center, belowQr + 140);
 
     const link = document.createElement('a');
     link.download = `sarvopakar-flyer-${qrRow.code}.png`;
