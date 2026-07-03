@@ -8,6 +8,9 @@ import {
   TrendingUp,
   CheckCircle2,
   Package,
+  Wrench,
+  CalendarCheck,
+  Activity,
 } from 'lucide-react';
 
 import { Card, CardContent } from '@/components/ui/card';
@@ -94,61 +97,117 @@ export function ShopAnalyticsTab() {
 
       {!loading && data && (
         <>
-          {/* KPI strip */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <KpiCard
-              icon={ShoppingBag}
-              label="Orders"
-              value={String(data.summary.totalOrders)}
-            />
-            <KpiCard
-              icon={IndianRupee}
-              label="Revenue"
-              value={`₹${data.summary.totalRevenue.toLocaleString()}`}
-            />
-            <KpiCard
-              icon={TrendingUp}
-              label="Avg order"
-              value={`₹${data.summary.avgOrderValue}`}
-            />
-            <KpiCard
-              icon={CheckCircle2}
-              label="Completion"
-              value={`${data.summary.completionRate}%`}
-              sub={`${data.summary.delivered}/${data.summary.totalOrders}`}
-            />
-          </div>
-
-          {/* Daily orders */}
-          <Card>
-            <CardContent className="pt-4 space-y-2">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold">Orders per day</h3>
-                <span className="text-xs text-muted-foreground">{data.summary.totalOrders} total</span>
-              </div>
-              <BarChart
-                data={data.series.map((s) => ({ label: s.day, value: s.orders }))}
-                color="#0C831F"
+          {/* Product KPI strip — hidden for pure service providers (0 orders). */}
+          {data.summary.totalOrders > 0 && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <KpiCard
+                icon={ShoppingBag}
+                label="Orders"
+                value={String(data.summary.totalOrders)}
               />
-            </CardContent>
-          </Card>
-
-          {/* Daily revenue */}
-          <Card>
-            <CardContent className="pt-4 space-y-2">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold">Revenue per day</h3>
-                <span className="text-xs text-muted-foreground">
-                  ₹{data.summary.totalRevenue.toLocaleString()} total
-                </span>
-              </div>
-              <BarChart
-                data={data.series.map((s) => ({ label: s.day, value: s.revenue }))}
-                color="#F8CD46"
-                formatValue={(v) => `₹${v}`}
+              <KpiCard
+                icon={IndianRupee}
+                label="Revenue"
+                value={`₹${data.summary.totalRevenue.toLocaleString()}`}
               />
-            </CardContent>
-          </Card>
+              <KpiCard
+                icon={TrendingUp}
+                label="Avg order"
+                value={`₹${data.summary.avgOrderValue}`}
+              />
+              <KpiCard
+                icon={CheckCircle2}
+                label="Completion"
+                value={`${data.summary.completionRate}%`}
+                sub={`${data.summary.delivered}/${data.summary.totalOrders}`}
+              />
+            </div>
+          )}
+
+          {/* Service bookings — shown for providers who have any bookings.
+              Bookings carry no revenue, so these are count-based metrics. */}
+          {data.bookingSummary && data.bookingSummary.totalBookings > 0 && (
+            <>
+              <div className="flex items-center gap-2 pt-1">
+                <Wrench className="h-4 w-4 text-primary" />
+                <h3 className="text-sm font-semibold">Service bookings</h3>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <KpiCard
+                  icon={CalendarCheck}
+                  label="Bookings"
+                  value={String(data.bookingSummary.totalBookings)}
+                />
+                <KpiCard
+                  icon={CheckCircle2}
+                  label="Completed"
+                  value={String(data.bookingSummary.completedBookings)}
+                />
+                <KpiCard
+                  icon={Activity}
+                  label="Active"
+                  value={String(data.bookingSummary.activeBookings)}
+                />
+                <KpiCard
+                  icon={TrendingUp}
+                  label="Completion"
+                  value={`${data.bookingSummary.completionRate}%`}
+                  sub={`${data.bookingSummary.completedBookings}/${data.bookingSummary.totalBookings}`}
+                />
+              </div>
+
+              {data.bookingSeries && data.bookingSeries.length > 0 && (
+                <Card>
+                  <CardContent className="pt-4 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-semibold">Bookings per day</h3>
+                      <span className="text-xs text-muted-foreground">
+                        {data.bookingSummary.totalBookings} total
+                      </span>
+                    </div>
+                    <BarChart
+                      data={data.bookingSeries.map((s) => ({ label: s.day, value: s.bookings }))}
+                      color="#0C831F"
+                    />
+                  </CardContent>
+                </Card>
+              )}
+            </>
+          )}
+
+          {/* Daily orders — only meaningful when there are product orders. */}
+          {data.summary.totalOrders > 0 && (
+            <>
+              <Card>
+                <CardContent className="pt-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-semibold">Orders per day</h3>
+                    <span className="text-xs text-muted-foreground">{data.summary.totalOrders} total</span>
+                  </div>
+                  <BarChart
+                    data={data.series.map((s) => ({ label: s.day, value: s.orders }))}
+                    color="#0C831F"
+                  />
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="pt-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-semibold">Revenue per day</h3>
+                    <span className="text-xs text-muted-foreground">
+                      ₹{data.summary.totalRevenue.toLocaleString()} total
+                    </span>
+                  </div>
+                  <BarChart
+                    data={data.series.map((s) => ({ label: s.day, value: s.revenue }))}
+                    color="#F8CD46"
+                    formatValue={(v) => `₹${v}`}
+                  />
+                </CardContent>
+              </Card>
+            </>
+          )}
 
           {/* Top products */}
           {data.topProducts.length > 0 && (
@@ -165,6 +224,15 @@ export function ShopAnalyticsTab() {
               </CardContent>
             </Card>
           )}
+
+          {/* Nothing yet — no product orders and no service bookings. */}
+          {data.summary.totalOrders === 0 &&
+            (!data.bookingSummary || data.bookingSummary.totalBookings === 0) && (
+              <div className="py-12 text-center text-sm text-muted-foreground">
+                No activity in the last {days} days yet. Your orders and bookings
+                will show up here.
+              </div>
+            )}
         </>
       )}
     </div>
