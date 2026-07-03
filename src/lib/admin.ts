@@ -146,6 +146,57 @@ export async function fetchAdminOrders(opts: { status?: string; shopId?: string 
   });
 }
 
+// ---- service bookings ----
+
+export interface AdminBooking {
+  _id: string;
+  status: string;
+  serviceName: string;
+  serviceCategory?: { _id: string; name?: string; icon?: string };
+  provider?: {
+    _id: string;
+    name: string;
+    logo?: string;
+    phone?: string;
+    address?: { line1?: string; line2?: string; city?: string; state?: string; pincode?: string };
+  };
+  customer?: { _id: string; name?: string; email?: string; phone?: string };
+  contactName?: string;
+  contactPhone?: string;
+  address?: {
+    label?: string;
+    line1?: string;
+    line2?: string;
+    city?: string;
+    state?: string;
+    pincode?: string;
+  };
+  scheduledDate?: string;
+  scheduledSlot?: string;
+  requestNow?: boolean;
+  notes?: string;
+  cancelReason?: string;
+  statusHistory?: Array<{
+    status: string;
+    at: string;
+    by?: string;
+    note?: string;
+  }>;
+  completedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export async function fetchAdminBookings(opts: { status?: string; providerId?: string } = {}) {
+  const search = new URLSearchParams();
+  if (opts.status) search.set('status', opts.status);
+  if (opts.providerId) search.set('providerId', opts.providerId);
+  const qs = search.toString();
+  return api<{ bookings: AdminBooking[] }>(`/admin/bookings${qs ? `?${qs}` : ''}`, {
+    token: token(),
+  });
+}
+
 // ---- categories ----
 
 export async function fetchAdminCategories() {
