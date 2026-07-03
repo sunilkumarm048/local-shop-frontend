@@ -172,65 +172,68 @@ export default function AdminQrCodesTab() {
     ctx.fillRect(0, 0, W, H);
 
     // Yellow header band
+    const headerH = 210;
     ctx.fillStyle = '#F8CD46';
-    ctx.fillRect(0, 0, W, 200);
+    ctx.fillRect(0, 0, W, headerH);
 
     ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
     ctx.fillStyle = '#7a5c00';
-    ctx.font = '500 24px sans-serif';
-    ctx.fillText('SARVOPAKAR', center, 60);
+    ctx.font = '500 26px sans-serif';
+    ctx.fillText('SARVOPAKAR', center, 58);
 
     ctx.fillStyle = '#1a1a1a';
-    ctx.font = '500 58px sans-serif';
-    ctx.fillText('सर्वोपकार', center, 122);
+    ctx.font = '500 62px sans-serif';
+    ctx.fillText('सर्वोपकार', center, 126);
 
     // Tagline pill — neutral so it fits both shops and service providers.
-    const pillText = 'Shop  ·  Services  ·  Nearby';
-    ctx.font = '500 20px sans-serif';
-    const pillW = ctx.measureText(pillText).width + 60;
-    const pillX = center - pillW / 2;
+    const pillText = 'Shop   ·   Services   ·   Nearby';
+    ctx.font = '500 21px sans-serif';
+    const pillW = ctx.measureText(pillText).width + 64;
     ctx.fillStyle = '#0C831F';
-    roundRect(ctx, pillX, 150, pillW, 38, 19);
+    roundRect(ctx, center - pillW / 2, 156, pillW, 40, 20);
     ctx.fill();
     ctx.fillStyle = '#ffffff';
-    ctx.fillText(pillText, center, 175);
+    ctx.fillText(pillText, center, 182);
 
-    // "Now on Sarvopakar" — extra gap below the yellow header for breathing room.
-    ctx.fillStyle = '#9a9a90';
+    // Eyebrow
+    ctx.fillStyle = '#a8a89e';
     ctx.font = '500 20px sans-serif';
-    ctx.fillText('NOW ON SARVOPAKAR', center, 296);
+    ctx.fillText('NOW ON SARVOPAKAR', center, headerH + 82);
 
-    // Shop / provider name (or code fallback)
-    ctx.fillStyle = '#1a1a1a';
-    ctx.font = '500 44px sans-serif';
+    // Shop / provider name (auto-shrinks if very long so it never clips)
     const shopName = qrRow.shopName || `Code ${qrRow.code}`;
-    ctx.fillText(shopName, center, 352);
+    let nameSize = 46;
+    do {
+      ctx.font = `500 ${nameSize}px sans-serif`;
+      if (ctx.measureText(shopName).width <= W - 120) break;
+      nameSize -= 2;
+    } while (nameSize > 26);
+    ctx.fillStyle = '#1a1a1a';
+    ctx.fillText(shopName, center, headerH + 138);
 
-    // Location line (e.g. "Narendrapur, Nemalo") with a map-pin marker.
-    let qrTop = 448;
+    // Location line with a map-pin marker
+    let afterHeader = headerH + 170;
     if (qrRow.shopLocation) {
-      ctx.font = '400 24px sans-serif';
+      ctx.font = '400 25px sans-serif';
       const textW = ctx.measureText(qrRow.shopLocation).width;
-      const pinGap = 20; // pin width + spacing
-      const groupW = textW + pinGap;
-      const startX = center - groupW / 2;
-      // Pin sits at the left of the group.
-      drawPin(ctx, startX + 8, 386, '#0C831F');
-      // Text starts after the pin (left-aligned within the group).
+      const pinGap = 22;
+      const startX = center - (textW + pinGap) / 2;
+      drawPin(ctx, startX + 9, headerH + 178, '#0C831F');
       ctx.fillStyle = '#6a6a62';
       ctx.textAlign = 'left';
-      ctx.fillText(qrRow.shopLocation, startX + pinGap, 394);
-      ctx.textAlign = 'center'; // restore for the rest of the flyer
-      qrTop = 448;
+      ctx.fillText(qrRow.shopLocation, startX + pinGap, headerH + 186);
+      ctx.textAlign = 'center';
+      afterHeader = headerH + 210;
     }
 
-    // QR — large and borderless. Sized to leave clear room for the caption
-    // lines below so nothing overlaps.
-    const sideMargin = 60;
-    const bottomTextH = 180;
-    const qrSize = Math.min(W - sideMargin * 2, H - qrTop - bottomTextH);
-    const qrX = center - qrSize / 2;
-    const qrY = qrTop;
+    // QR — large, borderless, pixel-snapped with a clean quiet-zone margin so
+    // no modules ever clip. Reserve room below for the three caption lines.
+    const bottomTextH = 200;
+    const maxSize = Math.min(W - 140, H - afterHeader - bottomTextH);
+    const qrSize = Math.floor(maxSize);
+    const qrX = Math.round(center - qrSize / 2);
+    const qrY = Math.round(afterHeader);
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(srcCanvas, qrX, qrY, qrSize, qrSize);
 
@@ -238,18 +241,18 @@ export default function AdminQrCodesTab() {
 
     // Scan cue
     ctx.fillStyle = '#0C831F';
-    ctx.font = '500 34px sans-serif';
-    ctx.fillText('Scan to order or book', center, belowQr + 52);
+    ctx.font = '500 36px sans-serif';
+    ctx.fillText('Scan to order or book', center, belowQr + 58);
 
-    // URL chip
-    ctx.fillStyle = '#8a8a80';
-    ctx.font = '400 24px monospace';
-    ctx.fillText(`${SITE.replace(/^https?:\/\//, '')}/q/${qrRow.code}`, center, belowQr + 96);
+    // URL
+    ctx.fillStyle = '#9a9a90';
+    ctx.font = '400 25px monospace';
+    ctx.fillText(`${SITE.replace(/^https?:\/\//, '')}/q/${qrRow.code}`, center, belowQr + 104);
 
     // Trust line
     ctx.fillStyle = '#6a6a62';
-    ctx.font = '400 22px sans-serif';
-    ctx.fillText('Trusted local  ·  Pay your way  ·  Book or order', center, belowQr + 140);
+    ctx.font = '400 23px sans-serif';
+    ctx.fillText('Trusted local   ·   Pay your way   ·   Book or order', center, belowQr + 150);
 
     const link = document.createElement('a');
     link.download = `sarvopakar-flyer-${qrRow.code}.png`;
