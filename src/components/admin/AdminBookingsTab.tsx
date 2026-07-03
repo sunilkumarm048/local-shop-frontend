@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Loader2, Phone, MapPin, User, Store, Wrench, Search, X, Clock } from 'lucide-react';
+import { Loader2, Phone, MapPin, User, Store, Wrench, Search, X, Clock, Check } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -35,6 +35,18 @@ function statusVariant(
 function prettyStatus(s: string): string {
   return s.replace(/_/g, ' ');
 }
+
+// Happy-path stages a booking moves through, in order — mirrors the customer
+// tracker so admin sees the same progress view. Terminal states shown apart.
+const FLOW = [
+  { id: 'requested', label: 'Requested' },
+  { id: 'accepted', label: 'Accepted' },
+  { id: 'scheduled', label: 'Scheduled' },
+  { id: 'on_the_way', label: 'On the way' },
+  { id: 'in_progress', label: 'In progress' },
+  { id: 'completed', label: 'Completed' },
+];
+const TERMINAL = ['declined', 'cancelled'];
 
 export function AdminBookingsTab() {
   const [status, setStatus] = useState<string>('active');
@@ -179,6 +191,8 @@ function BookingRow({ booking }: { booking: AdminBooking }) {
   const shortId = booking._id.slice(-6).toUpperCase();
   const [showHistory, setShowHistory] = useState(false);
   const history = booking.statusHistory ?? [];
+  const isTerminal = TERMINAL.includes(booking.status);
+  const currentIndex = FLOW.findIndex((s) => s.id === booking.status);
 
   const schedule = booking.requestNow
     ? 'ASAP (Now)'
@@ -225,6 +239,50 @@ function BookingRow({ booking }: { booking: AdminBooking }) {
             </div>
           </div>
         </div>
+
+        {/* Status progress tracker — same stepper the customer & provider see. */}
+        {isTerminal ? (
+          <div className="flex items-center gap-2 text-xs font-medium rounded-md px-3 py-1.5 bg-muted text-muted-foreground">
+            <X className="h-3.5 w-3.5" />
+            {booking.status === 'declined'
+              ? 'Provider declined this request.'
+              : 'Booking was cancelled.'}
+          </div>
+        ) : (
+          <div>
+            <div className="flex items-center gap-1 pt-0.5">
+              {FLOW.map((stage, i) => {
+                const reached = i <= currentIndex;
+                const isLast = i === FLOW.length - 1;
+                return (
+                  <div key={stage.id} className="flex items-center flex-1 last:flex-none">
+                    <div
+                      className={`h-5 w-5 rounded-full flex items-center justify-center shrink-0 ${
+                        reached ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
+                      }`}
+                    >
+                      {reached ? (
+                        <Check className="h-3 w-3" />
+                      ) : (
+                        <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                      )}
+                    </div>
+                    {!isLast && (
+                      <div
+                        className={`h-0.5 flex-1 mx-0.5 ${
+                          i < currentIndex ? 'bg-primary' : 'bg-muted'
+                        }`}
+                      />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <p className="text-[11px] font-semibold text-primary mt-1">
+              {FLOW[currentIndex]?.label || prettyStatus(booking.status)}
+            </p>
+          </div>
+        )}
 
         <div className="grid sm:grid-cols-2 gap-x-3 gap-y-2 text-xs text-muted-foreground">
           {/* Provider */}
