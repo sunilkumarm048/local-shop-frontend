@@ -26,7 +26,7 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    title: 'Sarvopakar',
+    title: 'सर्वोपकार',
     statusBarStyle: 'default',
   },
 };
