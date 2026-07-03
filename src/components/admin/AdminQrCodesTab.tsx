@@ -4,6 +4,19 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { Loader2, QrCode as QrIcon, Link2, X, RefreshCw, Download } from 'lucide-react';
 import { QRCodeCanvas } from 'qrcode.react';
 
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { ApiError } from '@/lib/api';
+import {
+  fetchQrCodes,
+  generateQrCodes,
+  linkQrCode,
+  unlinkQrCode,
+  fetchAdminShops,
+  type QrCodeRow,
+  type AdminShop,
+} from '@/lib/admin';
+
 /** Draw a rounded-rectangle path (broad canvas support without ctx.roundRect). */
 function roundRect(
   ctx: CanvasRenderingContext2D,
@@ -22,18 +35,21 @@ function roundRect(
   ctx.closePath();
 }
 
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { ApiError } from '@/lib/api';
-import {
-  fetchQrCodes,
-  generateQrCodes,
-  linkQrCode,
-  unlinkQrCode,
-  fetchAdminShops,
-  type QrCodeRow,
-  type AdminShop,
-} from '@/lib/admin';
+/** Draw a small map-pin marker (teardrop + hole) with tip at (cx, tipY). */
+function drawPin(ctx: CanvasRenderingContext2D, cx: number, tipY: number, color: string) {
+  const r = 8;
+  const cy = tipY - 14;
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, Math.PI, 0, false);
+  ctx.lineTo(cx, tipY);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.arc(cx, cy, 3, 0, Math.PI * 2);
+  ctx.fill();
+}
 
 const SITE =
   process.env.NEXT_PUBLIC_SITE_URL || 'https://www.sarvopakar.com';
@@ -183,12 +199,21 @@ export default function AdminQrCodesTab() {
     const shopName = qrRow.shopName || `Code ${qrRow.code}`;
     ctx.fillText(shopName, center, 312);
 
-    // Location line (e.g. "Narendrapur, Nemalo") when available.
+    // Location line (e.g. "Narendrapur, Nemalo") with a map-pin marker.
     let qrTop = 380;
     if (qrRow.shopLocation) {
-      ctx.fillStyle = '#6a6a62';
       ctx.font = '400 24px sans-serif';
-      ctx.fillText(qrRow.shopLocation, center, 348);
+      const textW = ctx.measureText(qrRow.shopLocation).width;
+      const pinGap = 20; // pin width + spacing
+      const groupW = textW + pinGap;
+      const startX = center - groupW / 2;
+      // Pin sits at the left of the group.
+      drawPin(ctx, startX + 6, 350, '#0C831F');
+      // Text starts after the pin (left-aligned within the group).
+      ctx.fillStyle = '#6a6a62';
+      ctx.textAlign = 'left';
+      ctx.fillText(qrRow.shopLocation, startX + pinGap, 348);
+      ctx.textAlign = 'center'; // restore for the rest of the flyer
       qrTop = 400;
     }
 
