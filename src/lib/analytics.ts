@@ -40,10 +40,26 @@ export interface ShopAnalyticsSummary {
   delivered: number;
 }
 
+export interface ShopBookingSummary {
+  totalBookings: number;
+  completedBookings: number;
+  activeBookings: number;
+  cancelledBookings: number;
+  completionRate: number;
+}
+
+export interface BookingDailyPoint {
+  /** YYYY-MM-DD UTC */
+  day: string;
+  bookings: number;
+}
+
 export interface ShopAnalyticsResponse {
   shop: { _id: string; name: string };
   range: AnalyticsRange;
   summary: ShopAnalyticsSummary;
+  bookingSummary?: ShopBookingSummary;
+  bookingSeries?: BookingDailyPoint[];
   series: DailyPoint[];
   topProducts: TopProduct[];
 }
