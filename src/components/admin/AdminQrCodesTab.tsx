@@ -35,19 +35,26 @@ function roundRect(
   ctx.closePath();
 }
 
-/** Draw a small map-pin marker (teardrop + hole) with tip at (cx, tipY). */
-function drawPin(ctx: CanvasRenderingContext2D, cx: number, tipY: number, color: string) {
-  const r = 8;
-  const cy = tipY - 14;
+/** Draw a GPS-style location marker (outer ring + solid center) at (cx, cy). */
+function drawPin(ctx: CanvasRenderingContext2D, cx: number, cy: number, color: string) {
+  // Classic teardrop map pin: round head + pointed base, white center hole.
+  const r = 10;
+  const headCy = cy - 6;
   ctx.fillStyle = color;
   ctx.beginPath();
-  ctx.arc(cx, cy, r, Math.PI, 0, false);
-  ctx.lineTo(cx, tipY);
+  // head arc (top ~270°) then taper to a point at the bottom
+  ctx.arc(cx, headCy, r, Math.PI * 0.8, Math.PI * 0.2, false);
+  ctx.lineTo(cx, cy + 12);
   ctx.closePath();
   ctx.fill();
+  // full round head to smooth the top
+  ctx.beginPath();
+  ctx.arc(cx, headCy, r, 0, Math.PI * 2);
+  ctx.fill();
+  // white center hole
   ctx.fillStyle = '#ffffff';
   ctx.beginPath();
-  ctx.arc(cx, cy, 3, 0, Math.PI * 2);
+  ctx.arc(cx, headCy, 4, 0, Math.PI * 2);
   ctx.fill();
 }
 
@@ -150,8 +157,8 @@ export default function AdminQrCodesTab() {
     const srcCanvas = qrCanvasRef.current?.querySelector('canvas');
     if (!srcCanvas || !qrRow) return;
 
-    const W = 680;
-    const H = 1000;
+    const W = 900;
+    const H = 1400;
     const c = document.createElement('canvas');
     c.width = W;
     c.height = H;
@@ -208,7 +215,7 @@ export default function AdminQrCodesTab() {
       const groupW = textW + pinGap;
       const startX = center - groupW / 2;
       // Pin sits at the left of the group.
-      drawPin(ctx, startX + 6, 350, '#0C831F');
+      drawPin(ctx, startX + 8, 340, '#0C831F');
       // Text starts after the pin (left-aligned within the group).
       ctx.fillStyle = '#6a6a62';
       ctx.textAlign = 'left';
@@ -217,11 +224,12 @@ export default function AdminQrCodesTab() {
       qrTop = 400;
     }
 
-    // QR in green frame
-    const qrSize = 360;
+    // QR in green frame — maximized to fill the sheet width for the longest
+    // possible scan distance on A4/A5 prints. Minimal side margin.
+    const pad = 14;
+    const qrSize = W - 2 * pad - 20; // near full-width
     const qrX = center - qrSize / 2;
     const qrY = qrTop;
-    const pad = 20;
     ctx.strokeStyle = '#0C831F';
     ctx.lineWidth = 6;
     roundRect(ctx, qrX - pad, qrY - pad, qrSize + pad * 2, qrSize + pad * 2, 20);
@@ -231,8 +239,8 @@ export default function AdminQrCodesTab() {
 
     // Scan cue
     ctx.fillStyle = '#0C831F';
-    ctx.font = '500 30px sans-serif';
-    ctx.fillText('Scan to order or book', center, qrY + qrSize + 70);
+    ctx.font = '500 32px sans-serif';
+    ctx.fillText('Scan to order or book', center, qrY + qrSize + 66);
 
     // URL chip
     ctx.fillStyle = '#8a8a80';
@@ -423,7 +431,7 @@ export default function AdminQrCodesTab() {
             <div ref={qrCanvasRef} className="flex justify-center mb-4">
               <QRCodeCanvas
                 value={`${SITE}/q/${qrRow.code}`}
-                size={360}
+                size={900}
                 level="M"
                 includeMargin
                 style={{ width: 220, height: 220 }}
