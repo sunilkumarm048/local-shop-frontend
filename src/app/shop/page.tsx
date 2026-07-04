@@ -251,25 +251,34 @@ function ShopHeader({ shop, userName, currentSection, onSelectSection, onShopUpd
           {shop.isOpen ? 'OPEN' : 'CLOSED'}
         </button>
 
-        {/* Available toggle (service providers only) */}
+        {/* Available toggle (service providers only). Availability requires the
+            shop to be open — a closed shop can't take jobs, so the toggle is
+            disabled and reads UNAVAILABLE until reopened. */}
         {shop.isService && (
           <button
             type="button"
             onClick={toggleAvailable}
-            disabled={togglingAvail}
+            disabled={togglingAvail || !shop.isOpen}
+            title={!shop.isOpen ? 'Open your shop first to become available' : undefined}
             aria-label={shop.availableNow ? 'Go offline' : 'Go available'}
             className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full text-xs font-bold shrink-0 transition-colors ${
-              shop.availableNow
-                ? 'bg-brand-green text-white hover:bg-brand-green/90'
-                : 'bg-white/70 hover:bg-white text-black'
+              !shop.isOpen
+                ? 'bg-white/40 text-black/40 cursor-not-allowed'
+                : shop.availableNow
+                  ? 'bg-brand-green text-white hover:bg-brand-green/90'
+                  : 'bg-white/70 hover:bg-white text-black'
             } ${togglingAvail ? 'opacity-60 cursor-wait' : ''}`}
           >
             {togglingAvail ? (
               <Loader2 className="h-3 w-3 animate-spin" />
             ) : (
-              <span className={`h-2 w-2 rounded-full ${shop.availableNow ? 'bg-white' : 'bg-muted-foreground'}`} />
+              <span
+                className={`h-2 w-2 rounded-full ${
+                  shop.isOpen && shop.availableNow ? 'bg-white' : 'bg-muted-foreground'
+                }`}
+              />
             )}
-            {shop.availableNow ? 'AVAILABLE' : 'UNAVAILABLE'}
+            {shop.isOpen && shop.availableNow ? 'AVAILABLE' : 'UNAVAILABLE'}
           </button>
         )}
 
