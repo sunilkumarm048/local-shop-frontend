@@ -153,7 +153,7 @@ function ServiceCard({ shop, km }: { shop: Shop; km: number | null }) {
               Busy — on a job
             </div>
           ) : (
-            shop.availableNow && (
+            shop.availableNow && shop.isOpen && (
               <div className="inline-flex items-center gap-1 text-[11px] font-bold text-white bg-brand-green px-1.5 py-0.5 rounded">
                 <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
                 Available now
@@ -232,6 +232,11 @@ function ServiceCard({ shop, km }: { shop: Shop; km: number | null }) {
           <div className="w-full h-9 mt-2 rounded-md bg-muted text-muted-foreground text-xs font-semibold flex items-center justify-center gap-1.5">
             <CalendarPlus className="h-4 w-4" />
             On a job — not taking bookings
+          </div>
+        ) : !shop.isOpen ? (
+          <div className="w-full h-9 mt-2 rounded-md bg-muted text-muted-foreground text-xs font-semibold flex items-center justify-center gap-1.5">
+            <Clock className="h-4 w-4" />
+            Closed — not taking bookings
           </div>
         ) : (
           <Link
