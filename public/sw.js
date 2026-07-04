@@ -136,6 +136,13 @@ self.addEventListener('push', (event) => {
     icon: '/icons/icon-192.png',
     badge: '/icons/icon-192.png',
     renotify: Boolean(data.tag),
+    // Alert flags: play the OS notification sound (not silent), buzz the
+    // device, and keep the notification on screen until the provider acts —
+    // this is how a backgrounded/locked device actually rings, since a web
+    // page itself cannot play audio while suspended.
+    silent: false,
+    requireInteraction: true,
+    vibrate: [200, 100, 200, 100, 200],
     // Declaring our own action replaces Chrome's default "Unsubscribe" button.
     actions: [{ action: 'open', title: 'View' }],
   };
