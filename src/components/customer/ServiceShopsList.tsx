@@ -105,6 +105,7 @@ export function ServiceShopsList({
 /* ----------------------------------------------------------------------- */
 
 function ServiceCard({ shop, km }: { shop: Shop; km: number | null }) {
+  // Backend substitutes live position into `location` for available providers.
   const [lng, lat] = shop.location?.coordinates ?? [];
   const hasCoords = typeof lat === 'number' && typeof lng === 'number';
 
