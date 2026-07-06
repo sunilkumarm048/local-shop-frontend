@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/stores/auth';
 import { useUser } from '@/hooks/useUser';
 import { logout } from '@/lib/auth';
-import { fetchMyShops, updateShop, setShopAvailability } from '@/lib/owner';
+import { fetchMyShops, updateShop, setShopAvailability, pingShopLocation } from '@/lib/owner';
 import { ApiError } from '@/lib/api';
 import type { Shop } from '@/lib/shops';
 
@@ -73,6 +73,37 @@ export default function ShopDashboard() {
     }
     defaultSectionAppliedRef.current = true;
   }, [shops]);
+
+  // ---- Live location streaming (service providers, app-open only) ----
+  // While a service provider is "Available" and has this dashboard open, stream
+  // their GPS to the backend so customers see their current position and
+  // "nearest first" reflects where they actually are. Throttled to once per
+  // ~20s. Stops when unavailable or the tab is hidden. (True background
+  // tracking isn't possible on the web — that needs the native app.)
+  const liveShop = shops?.[0];
+  useEffect(() => {
+    if (!liveShop?.isService || !liveShop.availableNow) return;
+    if (typeof navigator === 'undefined' || !navigator.geolocation) return;
+
+    let lastSent = 0;
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        if (document.hidden) return; // app-open only
+        const now = Date.now();
+        if (now - lastSent < 20_000) return; // throttle to 20s
+        lastSent = now;
+        pingShopLocation(liveShop._id, pos.coords.latitude, pos.coords.longitude).catch(
+          () => {}
+        );
+      },
+      () => {
+        /* permission denied / unavailable — silently skip */
+      },
+      { enableHighAccuracy: true, maximumAge: 15_000, timeout: 20_000 }
+    );
+
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, [liveShop?._id, liveShop?.isService, liveShop?.availableNow]);
 
   // ---- Loading / gating states ----
 
