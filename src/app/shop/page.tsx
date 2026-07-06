@@ -85,24 +85,34 @@ export default function ShopDashboard() {
     if (!liveShop?.isService || !liveShop.availableNow) return;
     if (typeof navigator === 'undefined' || !navigator.geolocation) return;
 
-    let lastSent = 0;
-    const watchId = navigator.geolocation.watchPosition(
-      (pos) => {
-        if (document.hidden) return; // app-open only
-        const now = Date.now();
-        if (now - lastSent < 20_000) return; // throttle to 20s
-        lastSent = now;
-        pingShopLocation(liveShop._id, pos.coords.latitude, pos.coords.longitude).catch(
-          () => {}
-        );
-      },
-      () => {
-        /* permission denied / unavailable — silently skip */
-      },
-      { enableHighAccuracy: true, maximumAge: 15_000, timeout: 20_000 }
-    );
+    let cancelled = false;
 
-    return () => navigator.geolocation.clearWatch(watchId);
+    const sendOnce = () => {
+      if (document.hidden) return; // app-open only
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          if (cancelled) return;
+          pingShopLocation(
+            liveShop._id,
+            pos.coords.latitude,
+            pos.coords.longitude
+          ).catch(() => {});
+        },
+        () => {
+          /* permission denied / unavailable — silently skip */
+        },
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 15_000 }
+      );
+    };
+
+    // Ping immediately, then every 20s while available + app open.
+    sendOnce();
+    const interval = setInterval(sendOnce, 20_000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, [liveShop?._id, liveShop?.isService, liveShop?.availableNow]);
 
   // ---- Loading / gating states ----
