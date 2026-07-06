@@ -74,6 +74,28 @@ export function TransportPinPicker({ role, value, onChange, initialCenter }: Pro
   const pinIcon = useMemo(() => makePin(role), [role]);
   const center = value || initialCenter || DEFAULT_CENTER;
 
+  // On open, if no pin/center is provided, drop it on the user's real GPS
+  // location rather than the Bhubaneswar default. Runs once.
+  const autoLocatedRef = useRef(false);
+  useEffect(() => {
+    if (autoLocatedRef.current) return;
+    autoLocatedRef.current = true;
+    if (value || initialCenter) return; // caller already gave a location
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const ll = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        const hint = await reverseGeocode(ll);
+        onChange(ll, hint);
+      },
+      () => {
+        /* denied/unavailable — stay on default; user can drag or search */
+      },
+      { enableHighAccuracy: true, timeout: 10_000, maximumAge: 0 }
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const [searchQ, setSearchQ] = useState('');
   const [searching, setSearching] = useState(false);
   const [results, setResults] = useState<NominatimResult[] | null>(null);
