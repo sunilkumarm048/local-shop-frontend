@@ -28,6 +28,12 @@ export interface Shop {
     type: 'Point';
     coordinates: [number, number]; // [lng, lat]
   };
+  // Service providers only: current live position + when it was last updated.
+  liveLocation?: {
+    type: 'Point';
+    coordinates: [number, number]; // [lng, lat]
+  };
+  locationUpdatedAt?: string;
 }
 
 export interface Product {
