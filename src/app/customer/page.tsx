@@ -351,11 +351,24 @@ export default function CustomerHome() {
 
   /* ---------- Distance + sort by nearest ---------- */
   const shopsWithDistance = useMemo(() => {
+    // Prefer a service provider's LIVE location when it's recent (< 10 min old);
+    // otherwise use their fixed storefront location. Product shops always use
+    // the fixed location.
+    const LIVE_FRESH_MS = 10 * 60 * 1000;
+    const coordsFor = (s: Shop): [number, number] => {
+      const live = s.liveLocation?.coordinates;
+      const fresh =
+        s.locationUpdatedAt &&
+        Date.now() - new Date(s.locationUpdatedAt).getTime() < LIVE_FRESH_MS;
+      if (s.isService && live && fresh) return live;
+      return s.location.coordinates;
+    };
+
     const withDist =
       lat == null || lng == null
         ? shops.map((s) => ({ shop: s, km: null as number | null }))
         : shops.map((s) => {
-            const [slng, slat] = s.location.coordinates;
+            const [slng, slat] = coordsFor(s);
             return { shop: s, km: haversineKm(lat, lng, slat, slng) };
           });
 
