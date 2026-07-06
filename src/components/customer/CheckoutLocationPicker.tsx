@@ -20,7 +20,7 @@ import { MapContainer, Marker, TileLayer, useMap, useMapEvents } from 'react-lea
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Loader2, MapPin, Search } from 'lucide-react';
-import { geoSearch, type GeoResult } from '@/lib/geo';
+import { geoSearch, getCurrentPosition, type GeoResult } from '@/lib/geo';
 
 // Leaflet default-icon shim — match the existing modal so a duplicate run is harmless.
 delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: unknown })._getIconUrl;
@@ -191,6 +191,26 @@ export function CheckoutLocationPicker({
   const handlePick = (la: number, lo: number) => {
     onChange({ lat: la, lng: lo, address: '', areaName: '' });
   };
+
+  // On open, if no location is set yet, drop the pin on the user's real GPS
+  // position instead of the Bhubaneswar default center. Runs once. Prevents the
+  // "pin opens ~2km off, drag to fix" problem.
+  const autoLocatedRef = useRef(false);
+  useEffect(() => {
+    if (autoLocatedRef.current) return;
+    if (lat != null && lng != null) {
+      autoLocatedRef.current = true; // parent already gave us a location
+      return;
+    }
+    autoLocatedRef.current = true;
+    setResolving(true);
+    getCurrentPosition()
+      .then((c) => {
+        if (c) handlePick(c.latitude, c.longitude);
+      })
+      .finally(() => setResolving(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const center: [number, number] = lat != null && lng != null ? [lat, lng] : DEFAULT_CENTER;
   const hasPin = lat != null && lng != null;
