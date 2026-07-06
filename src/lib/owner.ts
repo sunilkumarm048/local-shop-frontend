@@ -103,6 +103,15 @@ export async function setShopAvailability(id: string, availableNow: boolean) {
   );
 }
 
+/** Live location ping — updates the provider's shop position (app-open only). */
+export async function pingShopLocation(id: string, lat: number, lng: number) {
+  return api<{ ok: boolean }>(`/shops/${id}/location`, {
+    method: 'PATCH',
+    body: { lat, lng },
+    token: token(),
+  });
+}
+
 export async function fetchCategories() {
   return api<{ categories: Category[] }>('/shops/categories');
 }
