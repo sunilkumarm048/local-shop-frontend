@@ -82,56 +82,36 @@ export default function ShopDashboard() {
   // tracking isn't possible on the web — that needs the native app.)
   const liveShop = shops?.[0];
   useEffect(() => {
-    if (!liveShop) return;
-    // Diagnostic: log why streaming does or doesn't start.
-    console.log('[live-loc] check', {
-      isService: liveShop.isService,
-      availableNow: liveShop.availableNow,
-      shopId: liveShop._id,
-    });
-    if (!liveShop.isService) {
-      console.log('[live-loc] not a service shop — streaming off');
-      return;
-    }
-    if (!liveShop.availableNow) {
-      console.log('[live-loc] not available — streaming off');
-      return;
-    }
-    if (typeof navigator === 'undefined' || !navigator.geolocation) {
-      console.log('[live-loc] no geolocation API');
-      return;
-    }
+    if (!liveShop?.isService || !liveShop.availableNow) return;
+    if (typeof navigator === 'undefined' || !navigator.geolocation) return;
 
     let cancelled = false;
-    console.log('[live-loc] streaming STARTED (every 20s while app open)');
 
     const sendOnce = () => {
-      if (document.hidden) {
-        console.log('[live-loc] tab hidden — skip ping');
-        return;
-      }
+      if (document.hidden) return; // app-open only
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           if (cancelled) return;
-          console.log('[live-loc] got GPS, pinging:', pos.coords.latitude, pos.coords.longitude);
-          pingShopLocation(liveShop._id, pos.coords.latitude, pos.coords.longitude)
-            .then(() => console.log('[live-loc] ping OK'))
-            .catch((e) => console.error('[live-loc] ping FAILED:', e?.message || e));
+          pingShopLocation(
+            liveShop._id,
+            pos.coords.latitude,
+            pos.coords.longitude
+          ).catch(() => {});
         },
-        (err) => {
-          console.error('[live-loc] GPS error:', err.code, err.message);
+        () => {
+          /* permission denied / unavailable — silently skip */
         },
         { enableHighAccuracy: true, maximumAge: 0, timeout: 15_000 }
       );
     };
 
+    // Ping immediately, then every 20s while available + app open.
     sendOnce();
     const interval = setInterval(sendOnce, 20_000);
 
     return () => {
       cancelled = true;
       clearInterval(interval);
-      console.log('[live-loc] streaming stopped');
     };
   }, [liveShop?._id, liveShop?.isService, liveShop?.availableNow]);
 
