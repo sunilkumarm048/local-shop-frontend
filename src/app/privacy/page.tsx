@@ -175,14 +175,4 @@ Address: [REGISTERED ADDRESS]
 
 If you are not satisfied with our response, you may complain to the **Data Protection Board of India**.
 
----
 
-## CHECKLIST BEFORE PUBLISHING
-
-- [ ] Every `[PLACEHOLDER]` replaced with real information
-- [ ] Confirmed every third party listed in Section 4 is one you actually use — remove any you don't
-- [ ] Added any third party you use that isn't listed
-- [ ] Retention periods (Section 5) decided and filled in
-- [ ] Reviewed by a lawyer qualified in Indian law
-- [ ] Published at a public URL (e.g. `https://www.sarvopakar.com/privacy`)
-- [ ] Linked from your app footer, signup page, and Google Cloud OAuth consent screen
