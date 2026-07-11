@@ -10,6 +10,8 @@ import {
   ArrowRight,
 } from 'lucide-react';
 
+import { InstallAppButton } from '@/components/pwa/InstallAppButton';
+
 /**
  * Public landing page.
  *
@@ -59,6 +61,7 @@ export default function LandingPage() {
                 <Wrench className="h-4 w-4" />
                 Book a service
               </Link>
+              <InstallAppButton />
               <Link
                 href="/login"
                 className="inline-flex items-center justify-center gap-2 bg-white/80 backdrop-blur text-black font-semibold text-sm px-5 py-3.5 rounded-full border border-black/10 hover:bg-white active:scale-[0.98] transition"
