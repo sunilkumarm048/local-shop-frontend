@@ -16,7 +16,13 @@ import {
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ApiError } from '@/lib/api';
-import { playShopOrder, initNotificationSound } from '@/lib/notificationSound';
+import {
+  initNotificationSound,
+  startShopOrderAlert,
+  stopShopOrderAlert,
+} from '@/lib/notificationSound';
+import { ensurePushSubscribed } from '@/lib/push';
+import { useAuth } from '@/stores/auth';
 import type { Shop } from '@/lib/shops';
 
 /** Great-circle distance in km between two [lng, lat] points (haversine). */
@@ -114,7 +120,12 @@ export function BookingsTab({ shop }: { shop?: Shop }) {
         prevRequestedRef.current !== null &&
         requestedCount > prevRequestedRef.current
       ) {
-        playShopOrder();
+        // Ring like an incoming call — loops until Accept/Decline stops it.
+        startShopOrderAlert();
+      }
+      if (requestedCount === 0) {
+        // Nothing pending anymore (e.g. customer cancelled) — go quiet.
+        stopShopOrderAlert();
       }
       prevRequestedRef.current = requestedCount;
       setBookings(list);
@@ -123,17 +134,31 @@ export function BookingsTab({ shop }: { shop?: Shop }) {
     }
   }
 
+  const token = useAuth((s) => s.token);
+
   useEffect(() => {
     initNotificationSound();
+    // If notification permission was granted before but the subscription got
+    // lost (SW update / PWA reinstall), quietly restore it — no prompt.
+    if (token) ensurePushSubscribed(token);
     load();
     // Auto-refresh so new requests and status changes appear on their own.
     const interval = setInterval(() => {
       if (!document.hidden && !busyIdRef.current) load();
     }, 15000);
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      stopShopOrderAlert(); // never leave a ring playing after leaving the tab
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function act(id: string, update: BookingStatusUpdate) {
+    // Accept or Decline answers the alert — silence the ring immediately,
+    // before the network round-trip, so the tap feels instant.
+    if (update.status === 'accepted' || update.status === 'declined') {
+      stopShopOrderAlert();
+    }
     setBusyId(id);
     setError(null);
     try {
