@@ -1,0 +1,92 @@
+/**
+ * Native push bridge — runs only when the site is loaded inside the
+ * Sarvopakar Android app (Capacitor WebView), where the Capacitor bridge is
+ * injected as window.Capacitor. In normal browsers this is a silent no-op
+ * and web push (lib/push.ts) handles notifications instead.
+ *
+ * Flow: ask notification permission (native dialog, once per install) →
+ * register with FCM → POST the device token to the backend, which then
+ * sends order alerts through Firebase to this phone — ringing the custom
+ * "order_alerts" channel sound even when the app is fully closed.
+ */
+
+import { api } from './api';
+
+/* Minimal typings for the injected Capacitor bridge. */
+type CapPushPlugin = {
+  checkPermissions: () => Promise<{ receive: string }>;
+  requestPermissions: () => Promise<{ receive: string }>;
+  register: () => Promise<void>;
+  addListener: (
+    event: string,
+    cb: (data: never) => void
+  ) => Promise<{ remove: () => void }>;
+};
+
+type CapacitorGlobal = {
+  isNativePlatform?: () => boolean;
+  Plugins?: { PushNotifications?: CapPushPlugin };
+};
+
+function getCapacitor(): CapacitorGlobal | null {
+  if (typeof window === 'undefined') return null;
+  return (window as unknown as { Capacitor?: CapacitorGlobal }).Capacitor || null;
+}
+
+/** True when running inside the native Android app (not a browser/PWA). */
+export function isNativeApp(): boolean {
+  const cap = getCapacitor();
+  return Boolean(cap?.isNativePlatform?.());
+}
+
+let registered = false;
+
+/**
+ * Idempotent — safe to call from every dashboard mount. Registers this
+ * device for FCM push and reports the token to the backend. Also wires the
+ * notification-tap handler so tapping an alert opens the right page.
+ */
+export async function ensureNativePushRegistered(authToken: string): Promise<void> {
+  try {
+    if (registered) return;
+    if (!isNativeApp()) return;
+    const push = getCapacitor()?.Plugins?.PushNotifications;
+    if (!push) return;
+
+    // 1. Permission — native Android dialog, remembered forever per install.
+    let perm = await push.checkPermissions();
+    if (perm.receive === 'prompt' || perm.receive === 'prompt-with-rationale') {
+      perm = await push.requestPermissions();
+    }
+    if (perm.receive !== 'granted') return;
+
+    registered = true; // set before async listeners to avoid double-wiring
+
+    // 2. When FCM hands us the device token, store it on the backend.
+    await push.addListener('registration', (t: { value: string }) => {
+      api('/notifications/fcm-token', {
+        method: 'POST',
+        token: authToken,
+        body: { token: t.value, platform: 'android' },
+      }).catch(() => {
+        registered = false; // allow a retry on next mount
+      });
+    });
+
+    // 3. Tapping a notification navigates to the URL the backend attached.
+    await push.addListener(
+      'pushNotificationActionPerformed',
+      (event: { notification?: { data?: { url?: string } } }) => {
+        const url = event?.notification?.data?.url;
+        if (url && typeof window !== 'undefined') {
+          window.location.href = url;
+        }
+      }
+    );
+
+    // 4. Ask FCM for the token (fires the 'registration' listener above).
+    await push.register();
+  } catch {
+    /* never break the dashboard over push wiring */
+  }
+}
