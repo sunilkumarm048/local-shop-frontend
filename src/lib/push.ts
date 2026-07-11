@@ -59,6 +59,28 @@ export async function getPushStatus(): Promise<PushStatus> {
 }
 
 /**
+ * Silently re-establish the push subscription when permission was already
+ * granted before (e.g. after a service-worker update or PWA reinstall wiped
+ * the subscription). NEVER prompts the user: if permission is 'default' or
+ * 'denied' this is a no-op, so the one-time "Enable" flow stays one-time.
+ *
+ * Call this on dashboard mount — it makes "enable once, works every day"
+ * true even across SW reinstalls.
+ */
+export async function ensurePushSubscribed(token: string): Promise<void> {
+  try {
+    if (!isPushSupported()) return;
+    if (Notification.permission !== 'granted') return; // never prompt here
+    const status = await getPushStatus();
+    if (status === 'granted-unsubscribed') {
+      await subscribeToPush(token); // permission already granted → no popup
+    }
+  } catch {
+    /* best-effort — the visible PushSetup banner remains the fallback */
+  }
+}
+
+/**
  * Subscribe the current user to push.
  *
  * Returns the resulting PushStatus so the UI can render. Throws on permission
