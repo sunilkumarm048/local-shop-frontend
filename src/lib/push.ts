@@ -167,3 +167,4 @@ export async function unsubscribeFromPush(token: string): Promise<PushStatus> {
 export async function sendTestPush(token: string): Promise<void> {
   await api('/notifications/test', { method: 'POST', token });
 }
+  
