@@ -10,7 +10,7 @@
  * "order_alerts" channel sound even when the app is fully closed.
  */
 
-import { api } from './api';
+import { api } from './api' ;
 
 /* Minimal typings for the injected Capacitor bridge. */
 type CapPushPlugin = {
