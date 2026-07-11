@@ -26,9 +26,12 @@ import { ApiError } from '@/lib/api';
 import {
   initNotificationSound,
   playShopOrder,
+  startShopOrderAlert,
+  stopShopOrderAlert,
   isShopSoundMuted,
   setShopSoundMuted,
 } from '@/lib/notificationSound';
+import { ensurePushSubscribed } from '@/lib/push';
 import { PushSetup } from '@/components/notifications/PushSetup';
 import { SupportCard } from '@/components/support/SupportCard';
 import {
@@ -98,6 +101,11 @@ export function OrdersTab({ shopId }: Props) {
   useEffect(() => {
     initNotificationSound();
     setMuted(isShopSoundMuted());
+    // Restore a lost push subscription silently when permission is already
+    // granted (SW update / reinstall) — the provider is never re-asked.
+    if (token) ensurePushSubscribed(token);
+    return () => stopShopOrderAlert(); // no ring left behind on unmount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Keep a ref of the current orders so the socket handler (registered once)
@@ -130,7 +138,8 @@ export function OrdersTab({ shopId }: Props) {
     function onNewOrder() {
       // A new order landed for one of the owner's shops. Re-fetch the list
       // (cheap, capped at 200) rather than trying to merge a partial payload.
-      playShopOrder();
+      // Rings on loop until the owner accepts/rejects it.
+      startShopOrderAlert();
       setNewPing(true);
       setTimeout(() => setNewPing(false), 4_000);
       refresh();
@@ -160,6 +169,14 @@ export function OrdersTab({ shopId }: Props) {
       socket.off('order:status_update', onStatusUpdate);
     };
   }, [token, refresh]);
+
+  // If no order is waiting in "placed" anymore (accepted/rejected here or on
+  // another device, or cancelled by the customer), silence the ring.
+  useEffect(() => {
+    if (orders && !orders.some((o) => o.status === 'placed')) {
+      stopShopOrderAlert();
+    }
+  }, [orders]);
 
   // ---- Derived: counts + filtered view ----
   const visible = (orders || []).filter((o) => {
@@ -321,6 +338,11 @@ function OrderCard({ order, onChanged }: OrderCardProps) {
   const [siblingsOpen, setSiblingsOpen] = useState(false);
 
   async function runAction(label: string, fn: () => Promise<unknown>) {
+    // Accepting/rejecting answers the alert — stop the ring right away so
+    // the tap feels instant (the placed-count effect is the backstop).
+    if (label === 'accept' || label === 'reject') {
+      stopShopOrderAlert();
+    }
     setBusy(label);
     setActionError(null);
     try {
