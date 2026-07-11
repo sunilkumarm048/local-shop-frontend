@@ -22,6 +22,7 @@ import {
   stopShopOrderAlert,
 } from '@/lib/notificationSound';
 import { ensurePushSubscribed } from '@/lib/push';
+import { PushSetup } from '@/components/notifications/PushSetup';
 import { useAuth } from '@/stores/auth';
 import type { Shop } from '@/lib/shops';
 
@@ -200,6 +201,15 @@ export function BookingsTab({ shop }: { shop?: Shop }) {
 
   return (
     <div className="space-y-4">
+      {/* Push setup banner — the missing piece for background alerts. Shows
+          "Enable" until subscribed, an amber notice if blocked, and renders
+          nothing once fully subscribed. Without this, providers who only use
+          Bookings never get notifications when the app is minimized/closed. */}
+      <PushSetup
+        headline="Get alerts when service requests arrive"
+        subline="Even when the app is closed or your phone is locked. Recommended for providers."
+      />
+
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <h2 className="text-lg font-semibold">Service bookings</h2>
         <div className="flex gap-1 bg-muted p-1 rounded-lg">
