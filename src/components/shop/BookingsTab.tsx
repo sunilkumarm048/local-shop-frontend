@@ -22,6 +22,7 @@ import {
   stopShopOrderAlert,
 } from '@/lib/notificationSound';
 import { ensurePushSubscribed } from '@/lib/push';
+import { ensureNativePushRegistered } from '@/lib/nativePush';
 import { PushSetup } from '@/components/notifications/PushSetup';
 import { useAuth } from '@/stores/auth';
 import type { Shop } from '@/lib/shops';
@@ -141,7 +142,10 @@ export function BookingsTab({ shop }: { shop?: Shop }) {
     initNotificationSound();
     // If notification permission was granted before but the subscription got
     // lost (SW update / PWA reinstall), quietly restore it — no prompt.
-    if (token) ensurePushSubscribed(token);
+    if (token) {
+      ensurePushSubscribed(token); // browser / PWA web push
+      ensureNativePushRegistered(token); // native Android app (FCM)
+    }
     load();
     // Auto-refresh so new requests and status changes appear on their own.
     const interval = setInterval(() => {
