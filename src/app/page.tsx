@@ -22,6 +22,10 @@ import { InstallAppButton } from '@/components/pwa/InstallAppButton';
 export default function LandingPage() {
   return (
     <main className="min-h-screen flex flex-col bg-[#fafafa]">
+      {/* Floating "Install app" pill — top-right corner, out of the hero CTAs.
+          Hides itself automatically once the app is installed. */}
+      <InstallAppButton className="fixed top-3 right-3 z-50 inline-flex items-center gap-1.5 bg-black/90 backdrop-blur text-white text-xs font-bold px-3.5 py-2 rounded-full shadow-lg shadow-black/25 hover:bg-black active:scale-[0.97] transition" />
+
       {/* =================== HERO =================== */}
       <section className="relative overflow-hidden bg-gradient-to-br from-brand-yellow via-brand-yellow to-brand-yellowDark">
         {/* Soft radial accents */}
@@ -61,7 +65,6 @@ export default function LandingPage() {
                 <Wrench className="h-4 w-4" />
                 Book a service
               </Link>
-              <InstallAppButton />
               <Link
                 href="/login"
                 className="inline-flex items-center justify-center gap-2 bg-white/80 backdrop-blur text-black font-semibold text-sm px-5 py-3.5 rounded-full border border-black/10 hover:bg-white active:scale-[0.98] transition"
