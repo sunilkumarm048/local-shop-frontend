@@ -125,6 +125,52 @@ function play(channel: Channel): void {
   });
 }
 
+/* --------------- looping "ring until answered" alert --------------- */
+
+/**
+ * A phone-call-style alert for the shop channel: the sound loops
+ * continuously until `stopShopOrderAlert()` is called (which the UI does
+ * from the Accept / Decline handlers). A silent safety cap stops the loop
+ * after 2 minutes so a missed order can't ring forever.
+ */
+let shopLoopEl: HTMLAudioElement | null = null;
+let shopLoopTimer: ReturnType<typeof setTimeout> | null = null;
+const SHOP_LOOP_MAX_MS = 2 * 60 * 1000;
+
+export function startShopOrderAlert(): void {
+  if (typeof window === 'undefined') return;
+  if (isMuted('shop')) return;
+  // Already ringing — don't stack a second loop on top.
+  if (shopLoopEl && !shopLoopEl.paused) return;
+
+  const base = getPrimed('shop');
+  if (!base) return;
+  const el = base.cloneNode(true) as HTMLAudioElement;
+  el.volume = 0.7;
+  el.loop = true;
+  el.play().catch((err) => {
+    // eslint-disable-next-line no-console
+    console.warn('[notification sound:shop] loop play() blocked:', err?.name || err);
+  });
+  shopLoopEl = el;
+
+  if (shopLoopTimer) clearTimeout(shopLoopTimer);
+  shopLoopTimer = setTimeout(() => stopShopOrderAlert(), SHOP_LOOP_MAX_MS);
+}
+
+export function stopShopOrderAlert(): void {
+  if (shopLoopTimer) {
+    clearTimeout(shopLoopTimer);
+    shopLoopTimer = null;
+  }
+  if (shopLoopEl) {
+    shopLoopEl.loop = false;
+    shopLoopEl.pause();
+    shopLoopEl.currentTime = 0;
+    shopLoopEl = null;
+  }
+}
+
 /* --------------- public API --------------- */
 
 /** Call once near app boot (or first time a sound-using page mounts). */
