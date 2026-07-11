@@ -19,6 +19,7 @@ import { OrdersTab } from '@/components/shop/OrdersTab';
 import { BookingsTab } from '@/components/shop/BookingsTab';
 import { ShopAnalyticsTab } from '@/components/shop/ShopAnalyticsTab';
 import { CatalogTab } from '@/components/shop/CatalogTab';
+import { DownloadProviderApp } from '@/components/shop/DownloadProviderApp';
 
 type Section = 'storefront' | 'products' | 'catalog' | 'orders' | 'bookings' | 'analytics';
 
@@ -176,6 +177,7 @@ export default function ShopDashboard() {
       />
 
       <main className="flex-1 container py-6">
+        <DownloadProviderApp />
         <SectionNav current={section} onChange={setSection} isService={shop.isService} />
 
         <div className="mt-6">
