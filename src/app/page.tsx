@@ -154,6 +154,9 @@ export default function LandingPage() {
             <Link href="/login" className="hover:text-foreground transition">
               Sign in
             </Link>
+            <a href="/sarvopakar.apk" download className="hover:text-foreground transition">
+              Provider app (APK)
+            </a>
             <a
               href="mailto:support@sarvopakar.com"
               className="hover:text-foreground transition"
