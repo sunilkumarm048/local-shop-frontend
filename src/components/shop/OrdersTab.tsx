@@ -32,6 +32,7 @@ import {
   setShopSoundMuted,
 } from '@/lib/notificationSound';
 import { ensurePushSubscribed } from '@/lib/push';
+import { ensureNativePushRegistered } from '@/lib/nativePush';
 import { PushSetup } from '@/components/notifications/PushSetup';
 import { SupportCard } from '@/components/support/SupportCard';
 import {
@@ -103,7 +104,10 @@ export function OrdersTab({ shopId }: Props) {
     setMuted(isShopSoundMuted());
     // Restore a lost push subscription silently when permission is already
     // granted (SW update / reinstall) — the provider is never re-asked.
-    if (token) ensurePushSubscribed(token);
+    if (token) {
+      ensurePushSubscribed(token); // browser / PWA web push
+      ensureNativePushRegistered(token); // native Android app (FCM)
+    }
     return () => stopShopOrderAlert(); // no ring left behind on unmount
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
