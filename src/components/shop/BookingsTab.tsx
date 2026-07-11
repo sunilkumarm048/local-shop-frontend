@@ -401,5 +401,5 @@ function BookingCard({
         </div>
       </CardContent>
     </Card>
-  );
+  ) ;
 }
