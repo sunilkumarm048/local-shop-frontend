@@ -20,6 +20,7 @@ import {
   ShieldCheck,
   PackagePlus,
   QrCode,
+  Settings,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -41,6 +42,7 @@ import AdminManageProductsTab from '@/components/admin/AdminManageProductsTab';
 import AdminDocVerificationTab from '@/components/admin/AdminDocVerificationTab';
 import AdminTemplatesTab from '@/components/admin/AdminTemplatesTab';
 import AdminQrCodesTab from '@/components/admin/AdminQrCodesTab';
+import AdminSettingsTab from '@/components/admin/AdminSettingsTab';
 
 type Section =
   | 'overview'
@@ -56,7 +58,8 @@ type Section =
   | 'products'
   | 'verifications'
   | 'templates'
-  | 'qrcodes';
+  | 'qrcodes'
+  | 'settings';
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -133,6 +136,7 @@ export default function AdminDashboard() {
           {section === 'verifications' && <AdminDocVerificationTab />}
           {section === 'templates' && <AdminTemplatesTab />}
           {section === 'qrcodes' && <AdminQrCodesTab />}
+          {section === 'settings' && <AdminSettingsTab />}
         </div>
       </main>
     </div>
@@ -160,6 +164,7 @@ function SectionNav({ current, onChange }: NavProps) {
     { id: 'verifications', label: 'Verifications', icon: ShieldCheck },
     { id: 'templates', label: 'Templates', icon: PackagePlus },
     { id: 'qrcodes', label: 'QR Codes', icon: QrCode },
+    { id: 'settings', label: 'Settings', icon: Settings },
   ];
   return (
     <nav className="flex gap-1 border-b overflow-x-auto">
