@@ -1,4 +1,4 @@
-import { api } from './api';
+import { api, ApiError } from './api';
 import { useAuth } from '@/stores/auth';
 import type { User } from '@/types';
 
@@ -66,8 +66,14 @@ export async function refreshMe() {
     // Preserve token, update user
     useAuth.setState({ user });
     return user;
-  } catch {
-    useAuth.getState().clear();
+  } catch (err) {
+    // Only log the user out when the backend actually rejected the token
+    // (expired JWT, blocked/deleted account). Timeouts, network errors, and
+    // 5xx (e.g. Render free-tier cold starts) must NOT wipe the session —
+    // keep the persisted user and try again on the next page load.
+    if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+      useAuth.getState().clear();
+    }
     return null;
   }
 }
