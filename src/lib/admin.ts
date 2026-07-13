@@ -460,3 +460,21 @@ export async function unlinkQrCode(code: string) {
     { method: 'POST', token: token() }
   );
 }
+
+// ============================================================
+// App config — platform feature flags (Settings tab)
+// ============================================================
+
+import type { AppFlags } from './config';
+
+export async function fetchAdminAppConfig() {
+  return api<{ flags: AppFlags }>('/admin/config', { token: token() });
+}
+
+export async function updateAppFlags(flags: Partial<AppFlags>) {
+  return api<{ flags: AppFlags }>('/admin/config', {
+    method: 'PATCH',
+    body: { flags },
+    token: token(),
+  });
+}
