@@ -43,6 +43,16 @@ export default function MyBookingsPage() {
   const router = useRouter();
   const token = useAuth((s) => s.token);
 
+  // zustand-persist starts with default state (token=null) on first render
+  // and hydrates from localStorage on the next tick. Wait for hydration
+  // before making any auth decisions, otherwise we redirect signed-in users.
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => {
+    setHydrated(useAuth.persist.hasHydrated());
+    const unsub = useAuth.persist.onFinishHydration(() => setHydrated(true));
+    return unsub;
+  }, []);
+
   const [bookings, setBookings] = useState<Booking[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -63,6 +73,7 @@ export default function MyBookingsPage() {
   }
 
   useEffect(() => {
+    if (!hydrated) return;
     if (!token) {
       router.replace('/login?next=/customer/bookings');
       return;
@@ -75,7 +86,7 @@ export default function MyBookingsPage() {
     }, 15000);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, [hydrated, token]);
 
   async function cancel(id: string) {
     setBusyId(id);
