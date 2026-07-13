@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { getCurrentPosition } from '@/lib/geo';
+import { fetchAppFlags } from '@/lib/config';
 import {
   fetchNearbyShops,
   fetchShopProducts,
@@ -170,6 +171,9 @@ export default function CustomerHome() {
     new Map()
   );
   const [productsLoading, setProductsLoading] = useState(false);
+  // Admin kill switch for the All Products feed (see admin → Settings).
+  // Defaults true so a slow/failed config fetch never hides the storefront.
+  const [showAllProducts, setShowAllProducts] = useState(true);
 
   // 8g: Meesho-style multi-filter state for the Clothing & Fashion group.
   // Lives at page level (not inside the sidebar) so changing groups can
@@ -369,9 +373,14 @@ export default function CustomerHome() {
     });
   }, [shops, lat, lng]);
 
+  /* ---------- Feature flags ---------- */
+  useEffect(() => {
+    fetchAppFlags().then((f) => setShowAllProducts(f.showAllProducts));
+  }, []);
+
   /* ---------- All Products feed ---------- */
   useEffect(() => {
-    if (serviceMode) {
+    if (serviceMode || !showAllProducts) {
       setProductsByShop(new Map());
       return;
     }
@@ -384,7 +393,7 @@ export default function CustomerHome() {
     fetchProductsForShops(ids)
       .then(setProductsByShop)
       .finally(() => setProductsLoading(false));
-  }, [shopsWithDistance, serviceMode]);
+  }, [shopsWithDistance, serviceMode, showAllProducts]);
 
   /* ---------- Flattened, filtered, sorted product list ---------- */
   const allProducts = useMemo(() => {
@@ -651,14 +660,16 @@ export default function CustomerHome() {
             />
 
             {/* Products grid */}
-            <ProductsGrid
-              productsLoading={productsLoading}
-              allProducts={allProducts}
-              selectedShop={selectedShop}
-              setSelectedShopId={setSelectedShopId}
-              query={searchTerm}
-              showShopBadge
-            />
+            {showAllProducts && (
+              <ProductsGrid
+                productsLoading={productsLoading}
+                allProducts={allProducts}
+                selectedShop={selectedShop}
+                setSelectedShopId={setSelectedShopId}
+                query={searchTerm}
+                showShopBadge
+              />
+            )}
           </div>
         </div>
       ) : (
@@ -671,14 +682,16 @@ export default function CustomerHome() {
             shopsWithDistance={shopsWithDistance}
             selectedShopId={selectedShopId}
           />
-          <ProductsGrid
-            productsLoading={productsLoading}
-            allProducts={allProducts}
-            selectedShop={selectedShop}
-            setSelectedShopId={setSelectedShopId}
-            query={searchTerm}
-            showShopBadge={false}
-          />
+          {showAllProducts && (
+            <ProductsGrid
+              productsLoading={productsLoading}
+              allProducts={allProducts}
+              selectedShop={selectedShop}
+              setSelectedShopId={setSelectedShopId}
+              query={searchTerm}
+              showShopBadge={false}
+            />
+          )}
         </>
       )}
     </main>
