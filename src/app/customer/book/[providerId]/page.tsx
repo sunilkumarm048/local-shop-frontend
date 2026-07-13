@@ -92,11 +92,22 @@ export default function BookServicePage() {
 
   const days = useMemo(() => nextDays(7), []);
 
+  // zustand-persist starts with default state (token=null) on first render
+  // and hydrates from localStorage on the next tick. Wait for hydration
+  // before making any auth decisions, otherwise we redirect signed-in users.
+  const [hydrated, setHydrated] = useState(false);
   useEffect(() => {
+    setHydrated(useAuth.persist.hasHydrated());
+    const unsub = useAuth.persist.onFinishHydration(() => setHydrated(true));
+    return unsub;
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
     if (!token) {
       router.replace(`/login?next=/customer/book/${providerId}`);
     }
-  }, [token, providerId, router]);
+  }, [hydrated, token, providerId, router]);
 
   useEffect(() => {
     if (!providerId) return;
