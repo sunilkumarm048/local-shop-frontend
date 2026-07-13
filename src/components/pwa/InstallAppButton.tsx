@@ -33,6 +33,11 @@ function isIos(): boolean {
   return /iPad|iPhone|iPod/.test(window.navigator.userAgent);
 }
 
+function isAndroid(): boolean {
+  if (typeof window === 'undefined') return false;
+  return /Android/i.test(window.navigator.userAgent);
+}
+
 export function InstallAppButton({ className }: { className?: string }) {
   const [installEvent, setInstallEvent] = useState<BeforeInstallPromptEvent | null>(null);
   const [installed, setInstalled] = useState(false);
@@ -64,6 +69,13 @@ export function InstallAppButton({ className }: { className?: string }) {
   }, []);
 
   const onClick = useCallback(async () => {
+    // Android → serve the native APK (full app incl. the loud order ring,
+    // which the PWA cannot do). Starts the download and shows install steps.
+    if (isAndroid()) {
+      window.location.href = '/sarvopakar.apk';
+      setShowHelp(true);
+      return;
+    }
     if (installEvent) {
       try {
         await installEvent.prompt();
@@ -125,7 +137,30 @@ export function InstallAppButton({ className }: { className?: string }) {
               </button>
             </div>
 
-            {isIos() ? (
+            {isAndroid() ? (
+              <ol className="space-y-3 text-sm">
+                <li className="flex items-center gap-3">
+                  <span className="h-8 w-8 rounded-lg bg-brand-greenLight text-brand-green flex items-center justify-center shrink-0 font-bold">
+                    1
+                  </span>
+                  Downloading <b>sarvopakar.apk</b>… open it from your
+                  notifications or Downloads when finished
+                </li>
+                <li className="flex items-center gap-3">
+                  <span className="h-8 w-8 rounded-lg bg-brand-greenLight text-brand-green flex items-center justify-center shrink-0 font-bold">
+                    2
+                  </span>
+                  If asked, allow installing from this source — it&apos;s the
+                  official Sarvopakar app
+                </li>
+                <li className="flex items-center gap-3">
+                  <span className="h-8 w-8 rounded-lg bg-brand-greenLight text-brand-green flex items-center justify-center shrink-0 font-bold">
+                    3
+                  </span>
+                  Tap <b>Install</b> — Sarvopakar appears on your home screen
+                </li>
+              </ol>
+            ) : isIos() ? (
               <ol className="space-y-3 text-sm">
                 <li className="flex items-center gap-3">
                   <span className="h-8 w-8 rounded-lg bg-brand-greenLight text-brand-green flex items-center justify-center shrink-0">
