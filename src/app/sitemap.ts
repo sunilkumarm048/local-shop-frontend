@@ -1,7 +1,7 @@
 import type { MetadataRoute } from 'next';
 
 const SITE =
-  process.env.NEXT_PUBLIC_SITE_URL || 'https://local-shop-frontend.vercel.app';
+  process.env.NEXT_PUBLIC_SITE_URL || 'https://www.sarvopakar.com';
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
