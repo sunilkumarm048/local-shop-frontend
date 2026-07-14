@@ -175,6 +175,9 @@ export default function CustomerHome() {
   // Admin kill switch for the All Products feed (see admin → Settings).
   // Defaults true so a slow/failed config fetch never hides the storefront.
   const [showAllProducts, setShowAllProducts] = useState(true);
+  // Voice assistant is opt-in from admin Settings — hidden by default and
+  // fail-closed (a failed config fetch keeps it hidden, never surprise-shows).
+  const [voiceEnabled, setVoiceEnabled] = useState(false);
 
   // 8g: Meesho-style multi-filter state for the Clothing & Fashion group.
   // Lives at page level (not inside the sidebar) so changing groups can
@@ -376,7 +379,10 @@ export default function CustomerHome() {
 
   /* ---------- Feature flags ---------- */
   useEffect(() => {
-    fetchAppFlags().then((f) => setShowAllProducts(f.showAllProducts));
+    fetchAppFlags().then((f) => {
+      setShowAllProducts(f.showAllProducts);
+      setVoiceEnabled(f.enableVoiceAssistant);
+    });
   }, []);
 
   /* ---------- All Products feed ---------- */
@@ -706,7 +712,9 @@ export default function CustomerHome() {
         </>
       )}
 
-      {/* AI voice assistant — full catalog (unfiltered) as its context */}
+      {/* AI voice assistant — full catalog (unfiltered) as its context.
+          Rendered only when enabled in admin -> Settings. */}
+      {voiceEnabled && (
       <VoiceAssistant
         catalog={voiceCatalog}
         shops={shopsWithDistance}
@@ -726,6 +734,7 @@ export default function CustomerHome() {
           setSearchTerm('');
         }}
       />
+      )}
     </main>
   );
 }
