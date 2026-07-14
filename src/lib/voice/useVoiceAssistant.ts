@@ -5,14 +5,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 /**
  * useVoiceAssistant — React port of the old LocalShop `voice-ai.js` (v4).
  *
- * The heavy lifting (speech-to-text, the AI brain, text-to-speech) all lives
- * in the same Cloudflare Worker the old site used. This hook only handles the
+ * The heavy lifting (speech-to-text via Groq Whisper, the Gemini brain,
+ * Sarvam text-to-speech) all lives in our own backend at POST /api/voice. This hook only handles the
  * browser side:
  *
  *   1. Record mic audio (MediaRecorder) with voice-activity detection —
  *      auto-stops after ~1.2s of silence, so the user just talks.
  *   2. POST the audio + catalog context (products/shops/cart/history) to the
- *      worker's /api/voice endpoint.
+ *      backend's /api/voice endpoint.
  *   3. Get back { transcript, replyText, replyAudio (wav b64), action fields },
  *      play the reply, hand actions to the caller, loop back to listening.
  *
@@ -21,9 +21,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
  * worker returns `executeAction` (user said yes).
  */
 
-const WORKER_URL =
-  process.env.NEXT_PUBLIC_VOICE_WORKER_URL ||
-  'https://localshop-voice.sunilkumarm048.workers.dev';
+// Voice endpoint lives in our own backend (POST /api/voice on Render) —
+// all AI keys (Groq/Gemini/Sarvam) are server-side env vars there.
+// NEXT_PUBLIC_VOICE_API_URL can override (e.g. to point back at a worker).
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+const VOICE_URL = process.env.NEXT_PUBLIC_VOICE_API_URL || `${API_URL}/voice`;
 
 // VAD tuning — same values as the old site.
 const SILENCE_THRESHOLD = 0.018;
@@ -316,7 +318,7 @@ export function useVoiceAssistant({ getContext, onExecuteAction }: UseVoiceAssis
         fd.append('history', JSON.stringify(historyRef.current.slice(-8)));
         fd.append('pendingAction', JSON.stringify(pendingActionRef.current));
 
-        const res = await fetch(`${WORKER_URL}/api/voice`, { method: 'POST', body: fd });
+        const res = await fetch(VOICE_URL, { method: 'POST', body: fd });
         const text = await res.text();
 
         let data: WorkerResponse;
