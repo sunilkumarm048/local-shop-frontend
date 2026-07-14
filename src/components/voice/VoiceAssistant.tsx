@@ -25,10 +25,13 @@ import {
 interface VoiceAssistantProps {
   /** Full unfiltered catalog currently loaded on the page. */
   catalog: Array<{ product: Product; shop: Shop }>;
-  shops: Shop[];
+  /** Shops AND service providers, with distance from the customer. */
+  shops: Array<{ shop: Shop; km: number | null }>;
   onSearch: (query: string) => void;
   onSelectShop: (shopId: string | null) => void;
   onSelectCategory: (category: string | null) => void;
+  /** Switch the page between the Shop and Services tabs. */
+  onSetMode: (mode: 'shop' | 'services') => void;
 }
 
 const ACTION_LABELS: Record<string, string> = {
@@ -63,6 +66,7 @@ export function VoiceAssistant({
   onSearch,
   onSelectShop,
   onSelectCategory,
+  onSetMode,
 }: VoiceAssistantProps) {
   const router = useRouter();
   const cart = useCart();
@@ -77,10 +81,13 @@ export function VoiceAssistant({
       category: shop.category || null,
       inStock: shop.isOpen !== false,
     }));
-    const shopList: WorkerShop[] = shops.map((s) => ({
+    const shopList: WorkerShop[] = shops.map(({ shop: s, km }) => ({
       shopName: s.name,
       category: s.category || null,
       isOpen: s.isOpen !== false,
+      isService: s.isService === true,
+      availableNow: s.availableNow === true,
+      distanceKm: typeof km === 'number' ? Math.round(km * 10) / 10 : null,
     }));
     const cartItems: WorkerCartItem[] = cart.items.map((i) => ({
       name: i.name,
@@ -135,10 +142,25 @@ export function VoiceAssistant({
           onSelectCategory(action.category || null);
           break;
         case 'selectShop': {
-          const shop = findByName(shops, action.shopName, (s) => s.name);
-          onSelectShop(shop ? shop._id : null);
+          const hit = findByName(shops, action.shopName, (x) => x.shop.name);
+          onSelectShop(hit ? hit.shop._id : null);
           break;
         }
+        case 'bookProvider': {
+          const hit = findByName(shops, action.shopName, (x) => x.shop.name);
+          if (hit) setTimeout(() => router.push(`/customer/book/${hit.shop._id}`), 1200);
+          else onSetMode('services');
+          break;
+        }
+        case 'showServices':
+          onSetMode('services');
+          break;
+        case 'showShops':
+          onSetMode('shop');
+          break;
+        case 'openBookings':
+          setTimeout(() => router.push('/customer/bookings'), 1200);
+          break;
         case 'searchProduct':
           onSelectShop(null);
           onSearch(action.query || '');
@@ -147,7 +169,7 @@ export function VoiceAssistant({
           console.warn('[VoiceAssistant] Unknown action type:', action.type);
       }
     },
-    [catalog, shops, cart, router, onSearch, onSelectShop, onSelectCategory]
+    [catalog, shops, cart, router, onSearch, onSelectShop, onSelectCategory, onSetMode]
   );
 
   const va = useVoiceAssistant({ getContext, onExecuteAction: executeAction });
