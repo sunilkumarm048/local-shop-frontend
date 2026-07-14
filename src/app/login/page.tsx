@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { loginWithEmail, sendOtp, verifyOtp } from '@/lib/auth';
 import { ApiError } from '@/lib/api';
+import { fetchAppFlags } from '@/lib/config';
 import { GoogleSignInButton } from '@/components/auth/GoogleSignInButton';
 
 type Mode = 'email' | 'phone';
@@ -34,6 +35,15 @@ const otpSchema = z.object({
 export default function LoginPage() {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>('email');
+  // Admin switch (admin → Settings → "Phone / OTP login"). Defaults off so
+  // the phone flow never flashes while the flag loads.
+  const [phoneLoginEnabled, setPhoneLoginEnabled] = useState(false);
+  useEffect(() => {
+    fetchAppFlags().then((f) => setPhoneLoginEnabled(f.enablePhoneLogin));
+  }, []);
+  useEffect(() => {
+    if (!phoneLoginEnabled && mode === 'phone') setMode('email');
+  }, [phoneLoginEnabled, mode]);
   const [serverError, setServerError] = useState<string | null>(null);
   const [otpSent, setOtpSent] = useState(false);
   const [pendingPhone, setPendingPhone] = useState('');
@@ -125,7 +135,8 @@ export default function LoginPage() {
             </>
           )}
 
-          {/* Mode toggle */}
+          {/* Mode toggle — shown only when phone login is enabled in admin Settings */}
+          {phoneLoginEnabled && (
           <div className="grid grid-cols-2 gap-2 p-1 bg-muted rounded-md">
             <button
               type="button"
@@ -153,6 +164,7 @@ export default function LoginPage() {
               Phone
             </button>
           </div>
+          )}
 
           {serverError && (
             <div className="text-sm text-destructive bg-destructive/10 rounded-md px-3 py-2">
