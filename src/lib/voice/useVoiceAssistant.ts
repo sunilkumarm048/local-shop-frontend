@@ -59,6 +59,12 @@ export interface WorkerShop {
   shopName: string;
   category: string | null;
   isOpen: boolean;
+  /** True for home-service providers (electrician, plumber, …). */
+  isService: boolean;
+  /** Providers only: currently available for home visits. */
+  availableNow: boolean;
+  /** Distance from the customer in km (1 decimal), if known. */
+  distanceKm: number | null;
 }
 export interface WorkerCartItem {
   name: string;
