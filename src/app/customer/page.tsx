@@ -9,6 +9,7 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { getCurrentPosition } from '@/lib/geo';
 import { fetchAppFlags } from '@/lib/config';
+import { VoiceAssistant } from '@/components/voice/VoiceAssistant';
 import {
   fetchNearbyShops,
   fetchShopProducts,
@@ -396,6 +397,16 @@ export default function CustomerHome() {
   }, [shopsWithDistance, serviceMode, showAllProducts]);
 
   /* ---------- Flattened, filtered, sorted product list ---------- */
+  // Voice assistant gets the unfiltered catalog (before search/shop filters).
+  const voiceCatalog = useMemo(() => {
+    const list: Array<{ product: Product; shop: Shop }> = [];
+    for (const { shop } of shopsWithDistance) {
+      const ps = productsByShop.get(shop._id) || [];
+      for (const p of ps) list.push({ product: p, shop });
+    }
+    return list;
+  }, [shopsWithDistance, productsByShop]);
+
   const allProducts = useMemo(() => {
     let list: Array<{ product: Product; shop: Shop }> = [];
     for (const { shop } of shopsWithDistance) {
@@ -694,6 +705,18 @@ export default function CustomerHome() {
           )}
         </>
       )}
+
+      {/* AI voice assistant — full catalog (unfiltered) as its context */}
+      <VoiceAssistant
+        catalog={voiceCatalog}
+        shops={shopsWithDistance.map((x) => x.shop)}
+        onSearch={(q) => {
+          setSelectedShopId(null);
+          setSearchTerm(q);
+        }}
+        onSelectShop={(id) => setSelectedShopId(id)}
+        onSelectCategory={(c) => setActiveCategory(c)}
+      />
     </main>
   );
 }
