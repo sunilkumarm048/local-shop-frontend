@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Loader2, Eye, EyeOff, Smartphone } from 'lucide-react';
+import { Loader2, Eye, EyeOff, Smartphone, Mic, MicOff } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -161,6 +161,20 @@ export default function AdminSettingsTab() {
             onToggle={() => toggle('enablePhoneLogin')}
             offIcon={<Smartphone className="h-4 w-4 mr-1.5" />}
             onIcon={<Smartphone className="h-4 w-4 mr-1.5" />}
+          />
+
+          <FlagRow
+            title="AI voice assistant"
+            description="The mic button on the customer page — voice shopping and service booking in Odia/Hindi/English. Turn on when you're ready to launch it."
+            on={flags.enableVoiceAssistant}
+            onLabel="Enabled"
+            offLabel="Disabled"
+            turnOffText="Disable"
+            turnOnText="Enable"
+            saving={savingKey === 'enableVoiceAssistant'}
+            onToggle={() => toggle('enableVoiceAssistant')}
+            offIcon={<MicOff className="h-4 w-4 mr-1.5" />}
+            onIcon={<Mic className="h-4 w-4 mr-1.5" />}
           />
         </div>
       )}
