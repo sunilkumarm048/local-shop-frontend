@@ -102,6 +102,9 @@ export function VoiceButton() {
   // ---- visibility gates ----
   if (!supported) return null;
   if (HIDDEN_PATHS.has(pathname)) return null;
+  // Customer pages get the AI VoiceAssistant instead (same corner) — don't
+  // stack two mic buttons there.
+  if (scope === 'customer') return null;
   // Show on the landing page even when unauthenticated, but only if there's
   // a token (otherwise the user can't do much anyway).
   if (!token || !user) return null;
