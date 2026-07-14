@@ -7,9 +7,11 @@ import { api } from './api';
 export interface AppFlags {
   /** When false, the customer home hides the "All Products" feed. */
   showAllProducts: boolean;
+  /** When false, the login page hides the Phone/OTP sign-in option. */
+  enablePhoneLogin: boolean;
 }
 
-const DEFAULT_FLAGS: AppFlags = { showAllProducts: true };
+const DEFAULT_FLAGS: AppFlags = { showAllProducts: true, enablePhoneLogin: false };
 
 export async function fetchAppFlags(): Promise<AppFlags> {
   try {
