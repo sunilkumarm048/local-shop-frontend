@@ -709,13 +709,22 @@ export default function CustomerHome() {
       {/* AI voice assistant — full catalog (unfiltered) as its context */}
       <VoiceAssistant
         catalog={voiceCatalog}
-        shops={shopsWithDistance.map((x) => x.shop)}
+        shops={shopsWithDistance}
         onSearch={(q) => {
           setSelectedShopId(null);
           setSearchTerm(q);
         }}
         onSelectShop={(id) => setSelectedShopId(id)}
         onSelectCategory={(c) => setActiveCategory(c)}
+        onSetMode={(m) => {
+          if (m === 'services') {
+            if (servicesGroupNode) setActiveGroup(servicesGroupNode._id);
+          } else {
+            setActiveGroup(null);
+          }
+          setSelectedShopId(null);
+          setSearchTerm('');
+        }}
       />
     </main>
   );
