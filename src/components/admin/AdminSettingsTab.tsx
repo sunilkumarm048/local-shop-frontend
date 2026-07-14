@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Loader2, Eye, EyeOff } from 'lucide-react';
+import { Loader2, Eye, EyeOff, Smartphone } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -13,15 +13,72 @@ import type { AppFlags } from '@/lib/config';
 /**
  * Platform settings — feature flags that change the customer-facing app
  * instantly (customers pick the flag up on their next page load).
- *
- * Currently just one flag: show/hide the "All Products" feed on the
- * customer home page. The shops strip and individual shop pages are
- * unaffected.
  */
+
+function FlagRow({
+  title,
+  description,
+  on,
+  onLabel,
+  offLabel,
+  turnOnText,
+  turnOffText,
+  saving,
+  onToggle,
+  offIcon,
+  onIcon,
+}: {
+  title: string;
+  description: string;
+  on: boolean;
+  onLabel: string;
+  offLabel: string;
+  turnOnText: string;
+  turnOffText: string;
+  saving: boolean;
+  onToggle: () => void;
+  offIcon: React.ReactNode;
+  onIcon: React.ReactNode;
+}) {
+  return (
+    <Card>
+      <CardContent className="p-4 flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold">{title}</span>
+            {on ? (
+              <Badge className="bg-[#e6f6ea] text-[#0c831f] hover:bg-[#e6f6ea]">
+                {onLabel}
+              </Badge>
+            ) : (
+              <Badge variant="secondary">{offLabel}</Badge>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">{description}</p>
+        </div>
+
+        <Button
+          onClick={onToggle}
+          disabled={saving}
+          variant={on ? 'outline' : 'default'}
+          className="shrink-0"
+        >
+          {saving ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : on ? (
+            <>{offIcon} {turnOffText}</>
+          ) : (
+            <>{onIcon} {turnOnText}</>
+          )}
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function AdminSettingsTab() {
   const [flags, setFlags] = useState<AppFlags | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [savingKey, setSavingKey] = useState<keyof AppFlags | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -40,19 +97,19 @@ export default function AdminSettingsTab() {
     load();
   }, [load]);
 
-  async function toggleAllProducts() {
-    if (!flags || saving) return;
-    setSaving(true);
+  async function toggle(key: keyof AppFlags) {
+    if (!flags || savingKey) return;
+    setSavingKey(key);
     setError(null);
     try {
-      const r = await updateAppFlags({ showAllProducts: !flags.showAllProducts });
+      const r = await updateAppFlags({ [key]: !flags[key] });
       setFlags(r.flags);
     } catch (err) {
       setError(
         err instanceof ApiError ? err.message : 'Could not save. Try again.'
       );
     } finally {
-      setSaving(false);
+      setSavingKey(null);
     }
   }
 
@@ -77,48 +134,35 @@ export default function AdminSettingsTab() {
           <Loader2 className="h-4 w-4 animate-spin" /> Loading settings…
         </div>
       ) : (
-        <Card>
-          <CardContent className="p-4 flex items-start justify-between gap-4">
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold">
-                  All Products feed
-                </span>
-                {flags.showAllProducts ? (
-                  <Badge className="bg-[#e6f6ea] text-[#0c831f] hover:bg-[#e6f6ea]">
-                    Visible
-                  </Badge>
-                ) : (
-                  <Badge variant="secondary">Hidden</Badge>
-                )}
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                The product grid on the customer home page. Hiding it keeps
-                the “Shops near you” strip and individual shop pages working
-                as normal.
-              </p>
-            </div>
+        <div className="space-y-3">
+          <FlagRow
+            title="All Products feed"
+            description="The product grid on the customer home page. Hiding it keeps the “Shops near you” strip and individual shop pages working as normal."
+            on={flags.showAllProducts}
+            onLabel="Visible"
+            offLabel="Hidden"
+            turnOffText="Hide products"
+            turnOnText="Show products"
+            saving={savingKey === 'showAllProducts'}
+            onToggle={() => toggle('showAllProducts')}
+            offIcon={<EyeOff className="h-4 w-4 mr-1.5" />}
+            onIcon={<Eye className="h-4 w-4 mr-1.5" />}
+          />
 
-            <Button
-              onClick={toggleAllProducts}
-              disabled={saving}
-              variant={flags.showAllProducts ? 'outline' : 'default'}
-              className="shrink-0"
-            >
-              {saving ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : flags.showAllProducts ? (
-                <>
-                  <EyeOff className="h-4 w-4 mr-1.5" /> Hide products
-                </>
-              ) : (
-                <>
-                  <Eye className="h-4 w-4 mr-1.5" /> Show products
-                </>
-              )}
-            </Button>
-          </CardContent>
-        </Card>
+          <FlagRow
+            title="Phone / OTP login"
+            description="The Email/Phone toggle on the sign-in page. Keep this off until a real SMS provider is connected — Google and email login are unaffected."
+            on={flags.enablePhoneLogin}
+            onLabel="Enabled"
+            offLabel="Disabled"
+            turnOffText="Disable"
+            turnOnText="Enable"
+            saving={savingKey === 'enablePhoneLogin'}
+            onToggle={() => toggle('enablePhoneLogin')}
+            offIcon={<Smartphone className="h-4 w-4 mr-1.5" />}
+            onIcon={<Smartphone className="h-4 w-4 mr-1.5" />}
+          />
+        </div>
       )}
     </div>
   );
