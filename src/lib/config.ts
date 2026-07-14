@@ -9,9 +9,15 @@ export interface AppFlags {
   showAllProducts: boolean;
   /** When false, the login page hides the Phone/OTP sign-in option. */
   enablePhoneLogin: boolean;
+  /** When false, the customer page hides the AI voice assistant. */
+  enableVoiceAssistant: boolean;
 }
 
-const DEFAULT_FLAGS: AppFlags = { showAllProducts: true, enablePhoneLogin: false };
+const DEFAULT_FLAGS: AppFlags = {
+  showAllProducts: true,
+  enablePhoneLogin: false,
+  enableVoiceAssistant: false,
+};
 
 export async function fetchAppFlags(): Promise<AppFlags> {
   try {
