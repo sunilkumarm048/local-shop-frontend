@@ -1,7 +1,7 @@
 import type { MetadataRoute } from 'next';
 
 const SITE =
-  process.env.NEXT_PUBLIC_SITE_URL || 'https://local-shop-frontend.vercel.app';
+  process.env.NEXT_PUBLIC_SITE_URL || 'https://www.sarvopakar.com';
 
 /**
  * robots.txt — allow crawling of public pages, block private dashboards and
