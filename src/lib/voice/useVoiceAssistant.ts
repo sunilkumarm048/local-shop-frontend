@@ -87,6 +87,7 @@ interface WorkerResponse {
   transcript?: string;
   replyText?: string;
   replyAudio?: string;
+  lang?: string;
   pendingAction?: VoiceAction | null;
   executeAction?: VoiceAction | null;
   cancelAction?: boolean;
@@ -122,6 +123,7 @@ export function useVoiceAssistant({ getContext, onExecuteAction }: UseVoiceAssis
   const lastSoundRef = useRef(0);
   const pendingActionRef = useRef<VoiceAction | null>(null);
   const historyRef = useRef<Array<{ role: 'user' | 'assistant'; content: string }>>([]);
+  const lastLangRef = useRef('hi-IN');
 
   // Keep latest callbacks without re-creating the machinery.
   const getContextRef = useRef(getContext);
@@ -340,6 +342,7 @@ export function useVoiceAssistant({ getContext, onExecuteAction }: UseVoiceAssis
 
         setTranscript(data.transcript || '');
         setReply(data.replyText || '');
+        if (data.lang) lastLangRef.current = data.lang;
         if (data.transcript) historyRef.current.push({ role: 'user', content: data.transcript });
         if (data.replyText) historyRef.current.push({ role: 'assistant', content: data.replyText });
 
@@ -413,15 +416,56 @@ export function useVoiceAssistant({ getContext, onExecuteAction }: UseVoiceAssis
     startRecordingRef.current();
   }, []);
 
+  /**
+   * Speak an app-generated message (booking created, login needed, errors…)
+   * in the conversation's voice + language, and record it in history so the
+   * AI knows what happened on the next turn. Falls back to on-screen text
+   * when TTS is unavailable.
+   */
+  const announce = useCallback(
+    async (text: string, opts?: { lang?: string; appEvent?: string }) => {
+      if (!text) return;
+      historyRef.current.push({ role: 'assistant', content: opts?.appEvent ? `[APP] ${opts.appEvent}` : text });
+      setReply(text);
+      setTranscript('');
+      // Cut off any reply that is still playing.
+      if (currentAudioRef.current) {
+        currentAudioRef.current.onended = null;
+        currentAudioRef.current.pause();
+        currentAudioRef.current = null;
+      }
+      try {
+        const res = await fetch(`${VOICE_URL}/say`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, lang: opts?.lang || lastLangRef.current }),
+        });
+        const data = (await res.json().catch(() => null)) as { audio?: string | null } | null;
+        if (data?.audio) {
+          await playAudio(data.audio);
+          return;
+        }
+      } catch {
+        // TTS unreachable — text is already on screen.
+      }
+      if (activeRef.current) restartListening();
+    },
+    [playAudio, restartListening]
+  );
+
   const toggle = useCallback(() => {
     if (activeRef.current) endConversation();
     else void startConversation();
   }, [endConversation, startConversation]);
 
+  const getLang = useCallback(() => lastLangRef.current, []);
+
   return {
     active,
     mode,
     status,
+    announce,
+    getLang,
     transcript,
     reply,
     error,
