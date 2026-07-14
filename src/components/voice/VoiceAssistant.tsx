@@ -1,10 +1,14 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Mic, X, Loader2, Volume2 } from 'lucide-react';
 
 import { useCart } from '@/stores/cart';
+import { useAuth } from '@/stores/auth';
+import { useDeliveryLocation } from '@/stores/deliveryLocation';
+import { createBooking } from '@/lib/booking';
+import { ApiError } from '@/lib/api';
 import type { Product, Shop } from '@/lib/shops';
 import {
   useVoiceAssistant,
@@ -46,6 +50,7 @@ const ACTION_LABELS: Record<string, string> = {
   goToCheckout: '💳 Checkout chalu?',
   trackOrder: '📦 Track karu?',
   showOrderHistory: '📜 Orders dikhau?',
+  createBooking: '🔧 Booking karu?',
 };
 
 /** Loose name match: exact → contains → contained-by. */
@@ -70,6 +75,135 @@ export function VoiceAssistant({
 }: VoiceAssistantProps) {
   const router = useRouter();
   const cart = useCart();
+  const token = useAuth((s) => s.token);
+  const user = useAuth((s) => s.user);
+  const dLat = useDeliveryLocation((s) => s.lat);
+  const dLng = useDeliveryLocation((s) => s.lng);
+
+  // announce()/getLang() come from the hook created below — bridged via refs
+  // so the action executor (which is passed INTO the hook) can speak results
+  // in the conversation's language.
+  const announceRef = useRef<(text: string, opts?: { lang?: string; appEvent?: string }) => void>(
+    () => {}
+  );
+  const getLangRef = useRef<() => string>(() => 'hi-IN');
+
+  /** Pick the app-feedback message matching the conversation language. */
+  const msg = useCallback((od: string, hi: string, en: string) => {
+    const l = getLangRef.current();
+    return l.startsWith('od') ? od : l.startsWith('en') ? en : hi;
+  }, []);
+
+  const handleCreateBooking = useCallback(
+    async (action: VoiceAction) => {
+      const providerHit = findByName(
+        shops.filter((x) => x.shop.isService),
+        action.shopName,
+        (x) => x.shop.name
+      );
+
+      // Issue 1: not signed in — bookings need an account.
+      if (!token || !user) {
+        announceRef.current(
+          msg(
+            'Booking ପାଇଁ ପ୍ରଥମେ login କରିବାକୁ ପଡ଼ିବ — login page ଖୋଲୁଛି।',
+            'Booking ke liye pehle login karna hoga — login page khol raha hoon.',
+            'You need to log in before booking — opening the login page.'
+          ),
+          { appEvent: 'Booking failed: user is not logged in; sending them to the login page.' }
+        );
+        setTimeout(() => router.push('/login?next=/customer'), 2500);
+        return;
+      }
+
+      // Issue 2: provider not found in the current list.
+      if (!providerHit) {
+        announceRef.current(
+          msg(
+            'ଏହି provider ମିଳିଲେ ନାହିଁ — services list ଖୋଲୁଛି, ସେଠାରୁ ବାଛନ୍ତୁ।',
+            'Yeh provider list me nahi mila — services list khol raha hoon, wahan se choose kar lo.',
+            "Couldn't find that provider — opening the services list so you can choose."
+          ),
+          { appEvent: `Booking failed: provider "${action.shopName}" not found in the visible list.` }
+        );
+        onSetMode('services');
+        return;
+      }
+
+      const provider = providerHit.shop;
+
+      // Issue 3: provider is not available right now — be honest, don't book.
+      if (provider.availableNow === false) {
+        announceRef.current(
+          msg(
+            `${provider.name} ବର୍ତ୍ତମାନ available ନାହାଁନ୍ତି। ଅନ୍ୟ available provider ଦେଖନ୍ତୁ।`,
+            `${provider.name} abhi available nahi hain. Services list me dusre available providers dekh lo.`,
+            `${provider.name} isn't available right now. Check other available providers in the list.`
+          ),
+          { appEvent: `Booking failed: ${provider.name} is not available right now.` }
+        );
+        onSetMode('services');
+        return;
+      }
+
+      // Build the same shape the booking form sends: saved address + live pin.
+      const firstAddr = user.addresses?.[0];
+      const address =
+        typeof dLat === 'number' && typeof dLng === 'number'
+          ? {
+              line1: firstAddr?.line1,
+              city: firstAddr?.city,
+              state: firstAddr?.state,
+              pincode: firstAddr?.pincode,
+              location: { lng: dLng, lat: dLat },
+            }
+          : firstAddr
+            ? {
+                label: firstAddr.label,
+                line1: firstAddr.line1,
+                line2: firstAddr.line2,
+                city: firstAddr.city,
+                state: firstAddr.state,
+                pincode: firstAddr.pincode,
+              }
+            : undefined;
+
+      try {
+        await createBooking({
+          providerId: provider._id,
+          serviceName: (action.serviceName as string) || provider.category || 'Home service',
+          requestNow: true,
+          notes: (action.notes as string) || undefined,
+          contactName: user.name || undefined,
+          contactPhone: user.phone || undefined,
+          address,
+        });
+        announceRef.current(
+          msg(
+            `Booking ହୋଇଗଲା! ${provider.name} ଙ୍କୁ request ପଠାଗଲା — accept କଲେ notification ଆସିବ। Bookings page ଖୋଲୁଛି।`,
+            `Booking ho gayi! ${provider.name} ko request bhej di — accept karte hi notification aayega. Bookings page khol raha hoon.`,
+            `Booked! Your request went to ${provider.name} — you'll get a notification once they accept. Opening your Bookings page.`
+          ),
+          {
+            appEvent: `Booking created successfully with ${provider.name} for "${action.serviceName}". The user can track it on the Bookings page.`,
+          }
+        );
+        setTimeout(() => router.push('/customer/bookings'), 4000);
+      } catch (err) {
+        // Issue 4: the API refused — tell the user the real reason.
+        const reason = err instanceof ApiError ? err.message : 'network problem';
+        announceRef.current(
+          msg(
+            `Sorry, booking ହୋଇପାରିଲା ନାହିଁ — ${reason}। ଟିକେ ପରେ ପୁଣି try କରନ୍ତୁ।`,
+            `Sorry, booking nahi ho payi — ${reason}. Thodi der baad phir try karo, ya booking page se book kar lo.`,
+            `Sorry, the booking failed — ${reason}. Try again in a bit, or book from the provider's page.`
+          ),
+          { appEvent: `Booking failed with error: ${reason}` }
+        );
+      }
+    },
+    [shops, token, user, dLat, dLng, router, onSetMode, msg]
+  );
 
   const getContext = useCallback(() => {
     const products: WorkerProduct[] = catalog.map(({ product, shop }) => ({
@@ -146,6 +280,9 @@ export function VoiceAssistant({
           onSelectShop(hit ? hit.shop._id : null);
           break;
         }
+        case 'createBooking':
+          void handleCreateBooking(action);
+          break;
         case 'bookProvider': {
           const hit = findByName(shops, action.shopName, (x) => x.shop.name);
           if (hit) setTimeout(() => router.push(`/customer/book/${hit.shop._id}`), 1200);
@@ -169,10 +306,12 @@ export function VoiceAssistant({
           console.warn('[VoiceAssistant] Unknown action type:', action.type);
       }
     },
-    [catalog, shops, cart, router, onSearch, onSelectShop, onSelectCategory, onSetMode]
+    [catalog, shops, cart, router, onSearch, onSelectShop, onSelectCategory, onSetMode, handleCreateBooking]
   );
 
   const va = useVoiceAssistant({ getContext, onExecuteAction: executeAction });
+  announceRef.current = va.announce;
+  getLangRef.current = va.getLang;
 
   return (
     <>
