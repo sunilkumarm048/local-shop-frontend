@@ -168,24 +168,45 @@ export function VoiceAssistant({
               }
             : undefined;
 
+      // Scheduling: the brain sends requestNow OR scheduledDate ("YYYY-MM-DD")
+      // + scheduledSlot (one of the app's six slots). Normalise + validate,
+      // falling back to "as soon as possible" if the schedule is unusable.
+      const SLOTS = ['8–10 AM', '10–12 PM', '12–2 PM', '2–4 PM', '4–6 PM', '6–8 PM'];
+      const rawSlot = String(action.scheduledSlot || '').replace(/-/g, '–').trim();
+      const slot = SLOTS.find((x) => x === rawSlot) || SLOTS.find((x) => rawSlot && x.startsWith(rawSlot.split(' ')[0])) || null;
+      const rawDate = String(action.scheduledDate || '').slice(0, 10);
+      const dateIso = /^\d{4}-\d{2}-\d{2}$/.test(rawDate) ? new Date(`${rawDate}T00:00:00.000Z`).toISOString() : null;
+      const scheduled = action.requestNow !== true && dateIso && slot ? { scheduledDate: dateIso, scheduledSlot: slot } : null;
+
       try {
         await createBooking({
           providerId: provider._id,
           serviceName: (action.serviceName as string) || provider.category || 'Home service',
-          requestNow: true,
+          requestNow: !scheduled,
+          scheduledDate: scheduled?.scheduledDate,
+          scheduledSlot: scheduled?.scheduledSlot,
           notes: (action.notes as string) || undefined,
           contactName: user.name || undefined,
           contactPhone: user.phone || undefined,
           address,
         });
+        const when = scheduled
+          ? `${new Date(scheduled.scheduledDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}, ${scheduled.scheduledSlot}`
+          : null;
         announceRef.current(
           msg(
-            `Booking ହୋଇଗଲା! ${provider.name} ଙ୍କୁ request ପଠାଗଲା — accept କଲେ notification ଆସିବ। Bookings page ଖୋଲୁଛି।`,
-            `Booking ho gayi! ${provider.name} ko request bhej di — accept karte hi notification aayega. Bookings page khol raha hoon.`,
-            `Booked! Your request went to ${provider.name} — you'll get a notification once they accept. Opening your Bookings page.`
+            when
+              ? `Booking ହୋଇଗଲା! ${provider.name}, ${when} — accept କଲେ notification ଆସିବ।`
+              : `Booking ହୋଇଗଲା! ${provider.name} ଙ୍କୁ request ପଠାଗଲା — accept କଲେ notification ଆସିବ। Bookings page ଖୋଲୁଛି।`,
+            when
+              ? `Booking ho gayi! ${provider.name}, ${when} — accept karte hi notification aayega.`
+              : `Booking ho gayi! ${provider.name} ko request bhej di — accept karte hi notification aayega. Bookings page khol raha hoon.`,
+            when
+              ? `Booked! ${provider.name}, ${when} — you'll get a notification once they accept.`
+              : `Booked! Your request went to ${provider.name} — you'll get a notification once they accept. Opening your Bookings page.`
           ),
           {
-            appEvent: `Booking created successfully with ${provider.name} for "${action.serviceName}". The user can track it on the Bookings page.`,
+            appEvent: `Booking created successfully with ${provider.name} for "${action.serviceName}"${when ? ` scheduled ${when}` : ' (as soon as possible)'}. The user can track it on the Bookings page.`,
           }
         );
         setTimeout(() => router.push('/customer/bookings'), 4000);
