@@ -7,7 +7,7 @@ import { Minus, Plus, Search, ShoppingCart, Zap, ImageIcon, Star, Store, Wrench 
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { getCurrentPosition } from '@/lib/geo';
+import { getCurrentPosition, fetchRoadDistances, type RoadDistance } from '@/lib/geo';
 import { fetchAppFlags } from '@/lib/config';
 import { VoiceAssistant } from '@/components/voice/VoiceAssistant';
 import {
@@ -178,6 +178,8 @@ export default function CustomerHome() {
   // Voice assistant is opt-in from admin Settings — hidden by default and
   // fail-closed (a failed config fetch keeps it hidden, never surprise-shows).
   const [voiceEnabled, setVoiceEnabled] = useState(false);
+  // Road distance + ETA per provider (Ola Distance Matrix via our backend).
+  const [roadInfo, setRoadInfo] = useState<Record<string, RoadDistance>>({});
 
   // 8g: Meesho-style multi-filter state for the Clothing & Fashion group.
   // Lives at page level (not inside the sidebar) so changing groups can
@@ -376,6 +378,33 @@ export default function CustomerHome() {
       return a.km - b.km;
     });
   }, [shops, lat, lng]);
+
+  /* ---------- Road distance + ETA for providers (Ola Distance Matrix) ---- */
+  useEffect(() => {
+    if (!serviceMode || lat == null || lng == null) return;
+    const providers = shopsWithDistance
+      .filter(({ shop }) => shop.location?.coordinates?.length === 2)
+      .slice(0, 20);
+    if (!providers.length) return;
+    const dests = providers.map(({ shop }) => ({
+      lat: shop.location!.coordinates[1],
+      lng: shop.location!.coordinates[0],
+    }));
+    let stale = false;
+    fetchRoadDistances({ lat, lng }, dests).then((results) => {
+      if (stale || !results) return;
+      const next: Record<string, RoadDistance> = {};
+      providers.forEach(({ shop }, i) => {
+        const r = results[i];
+        if (r) next[shop._id] = r;
+      });
+      setRoadInfo(next);
+    });
+    return () => {
+      stale = true;
+    };
+  }, [serviceMode, lat, lng, shopsWithDistance]);
+
 
   /* ---------- Feature flags ---------- */
   useEffect(() => {
@@ -635,6 +664,7 @@ export default function CustomerHome() {
           <ServiceShopsList
             loading={loading}
             shopsWithDistance={shopsWithDistance}
+            roadInfo={roadInfo}
             maxKm={radiusKm}
             categoryName={
               activeGroupNode.children.find((c) => c._id === activeCategory)?.name
