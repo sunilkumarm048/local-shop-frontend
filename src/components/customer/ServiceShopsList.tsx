@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { MapPin, Star, Clock, Phone, Navigation, Store, ChevronLeft, CalendarPlus } from 'lucide-react';
 
 import { Card } from '@/components/ui/card';
-import { formatDistance } from '@/lib/geo';
+import { formatDistance, type RoadDistance } from '@/lib/geo';
 import type { Shop } from '@/lib/shops';
 
 interface ServiceShopsListProps {
@@ -16,6 +16,8 @@ interface ServiceShopsListProps {
   categoryName?: string;
   /** Called when the user taps "Back" to return to the category picker. */
   onBack?: () => void;
+  /** Road distance + ETA per shop id (Ola Distance Matrix); falls back to straight-line km. */
+  roadInfo?: Record<string, RoadDistance>;
 }
 
 /**
@@ -35,6 +37,7 @@ export function ServiceShopsList({
   maxKm = 25,
   categoryName,
   onBack,
+  roadInfo,
 }: ServiceShopsListProps) {
   // Cap to the service radius. Shops with unknown distance (no GPS) are kept
   // so the list isn't empty when location permission was denied.
@@ -95,7 +98,7 @@ export function ServiceShopsList({
 
       <div className="space-y-2.5">
         {visible.map(({ shop, km }) => (
-          <ServiceCard key={shop._id} shop={shop} km={km} />
+          <ServiceCard key={shop._id} shop={shop} km={km} road={roadInfo?.[shop._id]} />
         ))}
       </div>
     </section>
@@ -104,7 +107,7 @@ export function ServiceShopsList({
 
 /* ----------------------------------------------------------------------- */
 
-function ServiceCard({ shop, km }: { shop: Shop; km: number | null }) {
+function ServiceCard({ shop, km, road }: { shop: Shop; km: number | null; road?: RoadDistance }) {
   // Backend substitutes live position into `location` for available providers.
   const [lng, lat] = shop.location?.coordinates ?? [];
   const hasCoords = typeof lat === 'number' && typeof lng === 'number';
@@ -145,7 +148,9 @@ function ServiceCard({ shop, km }: { shop: Shop; km: number | null }) {
           {km != null && (
             <div className="inline-flex items-center gap-1 text-[11px] font-bold text-[#1857c1] bg-[#dbe9ff] px-1.5 py-0.5 rounded">
               <MapPin className="h-3 w-3" />
-              {formatDistance(km)} away
+              {road
+                ? `${road.km} km${road.mins ? ` · ~${road.mins} min` : ''} away`
+                : `${formatDistance(km)} away`}
             </div>
           )}
           {shop.busy ? (
