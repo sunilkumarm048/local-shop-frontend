@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/stores/auth';
 import { getSocket } from '@/lib/socket';
+import { hasNativeBackgroundLocation, startNativeLocationWatcher } from '@/lib/nativeLocation';
 
 interface LatLng {
   lat: number;
@@ -42,6 +43,36 @@ export function useLiveLocation({ enabled, orderIds, emitIntervalMs = 5_000 }: O
 
   useEffect(() => {
     if (!enabled) return;
+
+    /* ---- NATIVE APP: background tracking continues with the screen off or
+       the app minimized — the same watcher the provider dashboard uses. ---- */
+    if (hasNativeBackgroundLocation()) {
+      let stopWatcher: (() => void) | null = null;
+      let disposed = false;
+      startNativeLocationWatcher((la, ln) => {
+        const next = { lat: la, lng: ln };
+        setPosition(next);
+        setError(null);
+        const now = Date.now();
+        if (now - lastEmitRef.current < emitIntervalMs) return;
+        lastEmitRef.current = now;
+        const socket = getSocket(token);
+        socket?.emit('delivery:location', {
+          lat: next.lat,
+          lng: next.lng,
+          orderIds: orderIdsRef.current,
+        });
+      }).then((stop) => {
+        if (disposed) stop?.();
+        else stopWatcher = stop;
+      });
+      return () => {
+        disposed = true;
+        stopWatcher?.();
+      };
+    }
+
+    /* ---- WEB fallback: works only while the tab is open + foregrounded. ---- */
     if (!navigator.geolocation) {
       setError('Geolocation not supported');
       return;
