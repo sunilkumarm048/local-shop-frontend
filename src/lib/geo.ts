@@ -73,3 +73,35 @@ export async function geoReverse(
     return { address: `${lat.toFixed(5)}, ${lng.toFixed(5)}`, areaName: '' };
   }
 }
+
+/** Road distance + travel time for one destination, from /api/geo/route-distance. */
+export interface RoadDistance {
+  km: number;
+  mins: number | null;
+}
+
+/**
+ * Road distances from the customer to up to 20 provider coordinates, via the
+ * backend's Ola Distance Matrix proxy. Returns null when unavailable (no key,
+ * API down) — callers keep their straight-line estimate.
+ */
+export async function fetchRoadDistances(
+  origin: { lat: number; lng: number },
+  dests: Array<{ lat: number; lng: number }>
+): Promise<Array<RoadDistance | null> | null> {
+  if (!dests.length) return [];
+  try {
+    const destsParam = dests
+      .slice(0, 20)
+      .map((d) => `${d.lat},${d.lng}`)
+      .join('|');
+    const res = await fetch(
+      `${API_URL}/geo/route-distance?olat=${origin.lat}&olng=${origin.lng}&dests=${encodeURIComponent(destsParam)}`
+    );
+    if (!res.ok) return null;
+    const data = (await res.json()) as { results: Array<RoadDistance | null> | null };
+    return data.results;
+  } catch {
+    return null;
+  }
+}
