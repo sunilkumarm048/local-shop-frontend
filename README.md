@@ -1,12 +1,14 @@
-# Local Shop — Frontend
+# Sarvopakar (ସର୍ବୋପକାର) — Frontend
 
-A hyperlocal commerce platform for India: customers order from nearby shops and
-get fast delivery, local **service** providers (barbers, parlours, laundries,
-garages…) are discoverable "near me," and shop owners + delivery partners manage
-everything from their own dashboards. This repo is the **web client** (Next.js).
-The API lives in a separate backend repo.
+**Sarvopakar** is a hyperlocal commerce platform for Odisha, India: customers
+order from nearby shops with fast delivery, book local **home-service**
+providers (electricians, plumbers, parlours, garages…) discoverable "near me"
+with live provider location, and shop owners + delivery partners manage
+everything from their own dashboards — on the web, as a PWA, or via the
+native Android app. This repo is the **web client** (Next.js) and the
+**Capacitor Android app**. The API lives in a separate backend repo.
 
-> **Live demo:** https://local-shop-frontend.vercel.app
+> **Live:** https://www.sarvopakar.com
 
 ---
 
@@ -21,6 +23,11 @@ The API lives in a separate backend repo.
 - **Live order tracking** in real time
 - Ratings, reviews, and review photos
 - Installable **PWA** with push notifications
+- **Service booking** — request now or schedule (date + time slot), then track
+  the provider's **live location** with road distance + ETA (Ola Distance Matrix)
+- **AI voice assistant** 🎤 — shop and book services by talking in **Odia,
+  Hindi, or English** (Sarvam AI speech + Gemini/Sarvam-30B brain); can add to
+  cart, answer prices, and create real bookings with spoken confirmations
 
 **Shop owner**
 - Guided shop setup (profile, location pin, documents, photo gallery)
@@ -37,6 +44,15 @@ The API lives in a separate backend repo.
 **Admin**
 - Approve/manage shops, users, categories
 - Oversee orders, payouts, and withdrawal requests
+- **Feature flags** (Settings tab) — toggle the products feed, phone login,
+  and the voice assistant live, without a deploy
+
+**Native Android app (Capacitor)**
+- True **background live-location** for providers & delivery partners
+  (keeps tracking with the screen off)
+- **FCM push with a custom ring** that sounds even when the app is closed
+- Built & signed automatically by GitHub Actions and served from the site
+  (`public/sarvopakar.apk`) — no local Android toolchain needed
 
 ---
 
@@ -98,6 +114,7 @@ NEXT_PUBLIC_SOCKET_URL=https://your-api-host
 NEXT_PUBLIC_SITE_URL=https://your-site-url
 
 # Cloudinary (unsigned uploads from the browser)
+NEXT_PUBLIC_VOICE_API_URL=                # optional — voice endpoint override
 NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=your_cloud_name
 NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET=your_unsigned_preset
 ```
