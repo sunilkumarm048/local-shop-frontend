@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { ApiError } from '@/lib/api';
 import { fetchMyBookings, cancelBooking, type Booking } from '@/lib/booking';
+import { RescheduleDialog } from '@/components/booking/RescheduleDialog';
 import { submitReview } from '@/lib/reviews';
 import { useAuth } from '@/stores/auth';
 
@@ -56,6 +57,7 @@ export default function MyBookingsPage() {
   const [bookings, setBookings] = useState<Booking[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [reschedule, setReschedule] = useState<Booking | null>(null);
   // Ref mirror of busyId so the polling interval reads the latest value.
   const busyIdRef = useRef<string | null>(null);
   useEffect(() => {
@@ -145,9 +147,23 @@ export default function MyBookingsPage() {
               booking={b}
               busy={busyId === b._id}
               onCancel={() => cancel(b._id)}
+              onReschedule={() => setReschedule(b)}
             />
           ))}
         </div>
+      )}
+
+      {reschedule && providerOf(reschedule)?._id && (
+        <RescheduleDialog
+          booking={reschedule}
+          providerId={providerOf(reschedule)!._id}
+          onClose={() => setReschedule(null)}
+          onDone={(updated) =>
+            setBookings((prev) =>
+              prev ? prev.map((x) => (x._id === updated._id ? { ...x, ...updated } : x)) : prev
+            )
+          }
+        />
       )}
     </div>
   );
@@ -157,10 +173,12 @@ function BookingTracker({
   booking,
   busy,
   onCancel,
+  onReschedule,
 }: {
   booking: Booking;
   busy: boolean;
   onCancel: () => void;
+  onReschedule: () => void;
 }) {
   const provider = providerOf(booking);
   const isTerminal = TERMINAL.includes(booking.status);
@@ -256,6 +274,12 @@ function BookingTracker({
               <Phone className="h-3.5 w-3.5" />
               Call provider
             </a>
+          )}
+          {['requested', 'accepted', 'scheduled'].includes(booking.status) && (
+            <Button size="sm" variant="outline" disabled={busy} onClick={onReschedule}>
+              <CalendarPlus className="h-4 w-4 mr-1" />
+              Change slot
+            </Button>
           )}
           {canCancel && (
             <Button
