@@ -13,6 +13,13 @@ export interface Shop {
   isService?: boolean;
   /** Service providers: currently available for home visits. */
   availableNow?: boolean;
+  slotConfig?: {
+    slotMinutes?: number;
+    start?: string;
+    end?: string;
+    daysOff?: number[];
+    maxDaysAhead?: number;
+  };
   /** Service providers: currently on an active booking, so not bookable. */
   busy?: boolean;
   rating: number;
