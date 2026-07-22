@@ -24,6 +24,9 @@ import {
 import { ensurePushSubscribed } from '@/lib/push';
 import { ensureNativePushRegistered } from '@/lib/nativePush';
 import { PushSetup } from '@/components/notifications/PushSetup';
+import { SlotSettingsCard } from '@/components/shop/SlotSettingsCard';
+import { RescheduleDialog } from '@/components/booking/RescheduleDialog';
+import { CalendarClock } from 'lucide-react';
 import { useAuth } from '@/stores/auth';
 import type { Shop } from '@/lib/shops';
 
@@ -99,6 +102,7 @@ const FILTERS = [
 const ACTIVE_STATUSES = ['accepted', 'scheduled', 'on_the_way', 'in_progress'];
 
 export function BookingsTab({ shop }: { shop?: Shop }) {
+  const [reschedule, setReschedule] = useState<Booking | null>(null);
   const [bookings, setBookings] = useState<Booking[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState('requested');
@@ -214,6 +218,8 @@ export function BookingsTab({ shop }: { shop?: Shop }) {
         subline="Even when the app is closed or your phone is locked. Recommended for providers."
       />
 
+      {shop?._id && <SlotSettingsCard shopId={shop._id} initial={shop.slotConfig} />}
+
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <h2 className="text-lg font-semibold">Service bookings</h2>
         <div className="flex gap-1 bg-muted p-1 rounded-lg">
@@ -254,9 +260,19 @@ export function BookingsTab({ shop }: { shop?: Shop }) {
               busy={busyId === b._id}
               shopCoords={shop?.location?.coordinates}
               onAct={(u) => act(b._id, u)}
+              onReschedule={() => setReschedule(b)}
             />
           ))}
         </div>
+      )}
+
+      {reschedule && shop?._id && (
+        <RescheduleDialog
+          booking={reschedule}
+          providerId={shop._id}
+          onClose={() => setReschedule(null)}
+          onDone={() => load()}
+        />
       )}
     </div>
   );
@@ -267,7 +283,9 @@ function BookingCard({
   busy,
   shopCoords,
   onAct,
+  onReschedule,
 }: {
+  onReschedule: () => void;
   booking: Booking;
   busy: boolean;
   shopCoords?: [number, number];
@@ -377,6 +395,13 @@ function BookingCard({
                 Decline
               </Button>
             </>
+          )}
+
+          {['requested', 'accepted', 'scheduled'].includes(booking.status) && (
+            <Button size="sm" variant="outline" disabled={busy} onClick={onReschedule}>
+              <CalendarClock className="h-4 w-4 mr-1" />
+              Change slot
+            </Button>
           )}
 
           {nextActions.map((a) => (
