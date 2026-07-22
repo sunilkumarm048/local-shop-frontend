@@ -1,76 +1,112 @@
+'use client';
+
+import { useEffect, useRef, useState } from 'react';
+import { useAuth } from '@/stores/auth';
+import { getSocket } from '@/lib/socket';
+import { hasNativeBackgroundLocation, startNativeLocationWatcher } from '@/lib/nativeLocation';
+
+interface LatLng {
+  lat: number;
+  lng: number;
+}
+
+interface Opts {
+  /** Whether streaming should be active. Pass `false` to pause. */
+  enabled: boolean;
+  /** Order IDs to fan the location ping out to (so customers tracking them see the partner move). */
+  orderIds: string[];
+  /** Min ms between socket emits (the GPS may fire much faster). Default 5000. */
+  emitIntervalMs?: number;
+}
+
 /**
- * Native location bridge — used by useLiveLocation to keep tracking when the
- * site runs inside the Sarvopakar Android app (Capacitor WebView).
+ * PHASE 5b — Continuous GPS streaming for a delivery partner.
  *
- * Honest capability note: this uses the Capacitor Geolocation plugin when the
- * APK ships it. Until that plugin is added to the Android project, these
- * helpers report "not available" and callers fall back to web geolocation
- * (foreground-only). True screen-off background tracking additionally needs a
- * foreground-service plugin in the APK — planned for a future app build.
+ * - Uses navigator.geolocation.watchPosition (low-power, OS-driven updates).
+ * - Throttles socket emits to once per emitIntervalMs to avoid hammering the
+ *   server / customer's tracking page.
+ * - Returns the latest local position and any geolocation error so the UI can
+ *   show "GPS off" / "Permission denied" / a stat pill.
+ *
+ * Pass `enabled: false` (e.g. when offline) and the watcher unsubscribes.
  */
+export function useLiveLocation({ enabled, orderIds, emitIntervalMs = 5_000 }: Opts) {
+  const token = useAuth((s) => s.token);
+  const [position, setPosition] = useState<LatLng | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-type CapGeoPlugin = {
-  requestPermissions?: () => Promise<{ location?: string }>;
-  watchPosition: (
-    options: { enableHighAccuracy?: boolean; timeout?: number },
-    cb: (
-      position: { coords?: { latitude: number; longitude: number } } | null,
-      err?: unknown
-    ) => void
-  ) => Promise<string>;
-  clearWatch: (opts: { id: string }) => Promise<void>;
-};
+  // Keep latest orderIds in a ref so the geolocation callback (registered once)
+  // emits to the up-to-date set without re-subscribing on every render.
+  const orderIdsRef = useRef<string[]>(orderIds);
+  orderIdsRef.current = orderIds;
+  const lastEmitRef = useRef<number>(0);
 
-type CapacitorGlobal = {
-  isNativePlatform?: () => boolean;
-  Plugins?: { Geolocation?: CapGeoPlugin };
-};
+  useEffect(() => {
+    if (!enabled) return;
 
-function getGeo(): CapGeoPlugin | null {
-  if (typeof window === 'undefined') return null;
-  const cap = (window as unknown as { Capacitor?: CapacitorGlobal }).Capacitor;
-  if (!cap?.isNativePlatform?.()) return null;
-  return cap.Plugins?.Geolocation ?? null;
-}
-
-/** True when running in the native app AND its Geolocation plugin is present. */
-export function hasNativeBackgroundLocation(): boolean {
-  return getGeo() !== null;
-}
-
-/**
- * Start the native position watcher. Resolves to a stop function (or null if
- * unavailable / permission denied — the caller should then use the web path).
- */
-export async function startNativeLocationWatcher(
-  onPosition: (lat: number, lng: number) => void
-): Promise<(() => void) | null> {
-  const geo = getGeo();
-  if (!geo) return null;
-
-  try {
-    if (geo.requestPermissions) {
-      const perm = await geo.requestPermissions();
-      if (perm.location && perm.location !== 'granted') return null;
+    /* ---- NATIVE APP: background tracking continues with the screen off or
+       the app minimized — the same watcher the provider dashboard uses. ---- */
+    if (hasNativeBackgroundLocation()) {
+      let stopWatcher: (() => void) | null = null;
+      let disposed = false;
+      startNativeLocationWatcher((la, ln) => {
+        const next = { lat: la, lng: ln };
+        setPosition(next);
+        setError(null);
+        const now = Date.now();
+        if (now - lastEmitRef.current < emitIntervalMs) return;
+        lastEmitRef.current = now;
+        const socket = getSocket(token);
+        socket?.emit('delivery:location', {
+          lat: next.lat,
+          lng: next.lng,
+          orderIds: orderIdsRef.current,
+        });
+      }).then((stop) => {
+        if (disposed) stop?.();
+        else stopWatcher = stop;
+      });
+      return () => {
+        disposed = true;
+        stopWatcher?.();
+      };
     }
 
-    const watchId = await geo.watchPosition(
-      { enableHighAccuracy: true, timeout: 15_000 },
-      (position) => {
-        const lat = position?.coords?.latitude;
-        const lng = position?.coords?.longitude;
-        if (typeof lat === 'number' && typeof lng === 'number') {
-          onPosition(lat, lng);
-        }
+    /* ---- WEB fallback: works only while the tab is open + foregrounded. ---- */
+    if (!navigator.geolocation) {
+      setError('Geolocation not supported');
+      return;
+    }
+
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        const next = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setPosition(next);
+        setError(null);
+
+        // Throttle socket emits — many devices fire watchPosition every 1s or
+        // faster; that's too chatty for a live tracking link.
+        const now = Date.now();
+        if (now - lastEmitRef.current < emitIntervalMs) return;
+        lastEmitRef.current = now;
+
+        const socket = getSocket(token);
+        socket?.emit('delivery:location', {
+          lat: next.lat,
+          lng: next.lng,
+          orderIds: orderIdsRef.current,
+        });
+      },
+      (err) => setError(err.message || 'Could not get your location.'),
+      {
+        enableHighAccuracy: true,
+        maximumAge: 5_000,
+        timeout: 30_000,
       }
     );
 
-    return () => {
-      geo.clearWatch({ id: watchId }).catch(() => {
-        /* already cleared */
-      });
-    };
-  } catch {
-    return null;
-  }
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, [enabled, token, emitIntervalMs]);
+
+  return { position, error };
 }
