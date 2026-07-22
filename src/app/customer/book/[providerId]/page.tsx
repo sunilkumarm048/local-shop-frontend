@@ -19,6 +19,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { ApiError } from '@/lib/api';
 import { fetchShop, type Shop } from '@/lib/shops';
 import { createBooking } from '@/lib/booking';
+import { SlotPicker } from '@/components/booking/SlotPicker';
 import { useAuth } from '@/stores/auth';
 
 // Leaflet map — load client-side only (react-leaflet breaks during SSR).
@@ -38,15 +39,6 @@ interface AddressHints {
   state?: string;
   pincode?: string;
 }
-
-const TIME_SLOTS = [
-  '8–10 AM',
-  '10–12 PM',
-  '12–2 PM',
-  '2–4 PM',
-  '4–6 PM',
-  '6–8 PM',
-];
 
 // Next 7 days as selectable date chips.
 function nextDays(n: number) {
@@ -90,7 +82,6 @@ export default function BookServicePage() {
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
 
-  const days = useMemo(() => nextDays(7), []);
 
   // zustand-persist starts with default state (token=null) on first render
   // and hydrates from localStorage on the next tick. Wait for hydration
@@ -323,41 +314,17 @@ export default function BookServicePage() {
           </button>
         </div>
 
-        {when === 'schedule' && (
-          <div className="space-y-3 pt-1">
-            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-              {days.map((d) => (
-                <button
-                  key={d.iso}
-                  type="button"
-                  onClick={() => setDateIso(d.iso)}
-                  className={`shrink-0 w-16 py-2 rounded-lg border text-center transition-colors ${
-                    dateIso === d.iso
-                      ? 'bg-primary text-primary-foreground border-primary'
-                      : 'bg-card border-border hover:bg-muted'
-                  }`}
-                >
-                  <div className="text-xs font-bold">{d.label}</div>
-                  <div className="text-[10px] opacity-80">{d.sub}</div>
-                </button>
-              ))}
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              {TIME_SLOTS.map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  onClick={() => setSlot(s)}
-                  className={`py-2 rounded-lg border text-xs font-medium transition-colors ${
-                    slot === s
-                      ? 'bg-primary text-primary-foreground border-primary'
-                      : 'bg-card border-border hover:bg-muted'
-                  }`}
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
+        {when === 'schedule' && providerId && (
+          <div className="pt-1">
+            <SlotPicker
+              providerId={providerId}
+              dateIso={dateIso}
+              slot={slot}
+              onChange={(d, s) => {
+                setDateIso(d);
+                setSlot(s);
+              }}
+            />
           </div>
         )}
       </div>
