@@ -39,7 +39,16 @@ export interface CreateShopPayload {
   openingHours?: OpeningHour[];
 }
 
-export type UpdateShopPayload = Partial<CreateShopPayload> & { isOpen?: boolean };
+export type UpdateShopPayload = Partial<CreateShopPayload> & {
+  isOpen?: boolean;
+  slotConfig?: {
+    slotMinutes?: number;
+    start?: string;
+    end?: string;
+    daysOff?: number[];
+    maxDaysAhead?: number;
+  };
+};
 
 export async function fetchMyShops() {
   return api<{ shops: Shop[] }>('/shops/mine', { token: token() });
