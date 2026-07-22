@@ -139,3 +139,43 @@ export async function updateBookingStatus(id: string, update: BookingStatusUpdat
   });
   return booking;
 }
+
+/* ------------------------- slots ------------------------- */
+
+export interface SlotInfo {
+  slot: string;
+  free: boolean;
+  past: boolean;
+}
+
+export interface SlotConfig {
+  slotMinutes?: number;
+  start?: string;
+  end?: string;
+  daysOff?: number[];
+  maxDaysAhead?: number;
+}
+
+/** Availability for a provider on a date (public — used by the booking page). */
+export async function fetchProviderSlots(providerId: string, dateIso: string) {
+  return api<{ slots: SlotInfo[]; dayOff: boolean; config: SlotConfig }>(
+    `/bookings/slots/${providerId}?date=${dateIso}`
+  );
+}
+
+/** Move a booking to another slot (allowed for customer and provider). */
+export async function rescheduleBooking(
+  id: string,
+  dateIso: string,
+  slot: string
+) {
+  const { booking } = await api<{ booking: Booking }>(
+    `/bookings/${id}/reschedule`,
+    {
+      method: 'PATCH',
+      token: token(),
+      body: { scheduledDate: dateIso, scheduledSlot: slot },
+    }
+  );
+  return booking;
+}
