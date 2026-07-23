@@ -12,6 +12,7 @@
  * Pass `headline` and `subline` to customize the copy per role.
  */
 
+import { isNativeApp } from '@/lib/nativePush';
 import { useEffect, useState } from 'react';
 import { BellRing, BellOff, Loader2, Send } from 'lucide-react';
 
@@ -93,8 +94,36 @@ export function PushSetup({ headline, subline, className }: Props) {
     }
   };
 
-  /* ----------- unsupported: hide entirely ----------- */
-  if (status === 'unsupported') return null;
+  /* ----------- native app: always show the FCM test link ----------- */
+  // Checked FIRST, before any web-push status logic: inside the Capacitor
+  // WebView the Push API reports inconsistent capabilities, which previously
+  // hid this row entirely. Native alerts go through FCM; the same
+  // /notifications/test endpoint rings them, so the link works regardless of
+  // what web push claims.
+  if (isNativeApp()) {
+    return (
+      <div
+        className={`inline-flex items-center gap-1.5 text-xs text-muted-foreground ${className || ''}`}
+      >
+        <button
+          onClick={test}
+          disabled={busy}
+          className="text-brand-green font-semibold hover:underline disabled:opacity-50 inline-flex items-center gap-1"
+          title="Send a test notification"
+        >
+          <Send className="h-3 w-3" />
+          Test notification
+        </button>
+        <span className="opacity-80">· App alerts active</span>
+        {error && <span className="text-destructive ml-2">{error}</span>}
+      </div>
+    );
+  }
+
+  /* ----------- unsupported ----------- */
+  if (status === 'unsupported') {
+    return null;
+  }
 
   /* ----------- subscribed: tiny inline controls ----------- */
   if (status === 'granted-subscribed') {
