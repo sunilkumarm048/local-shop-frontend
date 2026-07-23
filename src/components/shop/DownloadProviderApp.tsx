@@ -59,7 +59,7 @@ export function DownloadProviderApp() {
       </div>
       <div className="flex-1 min-w-0">
         <div className="text-sm font-bold text-brand-green">
-          Get the Sarvopakar Provider app
+          Get the Sarvopakar Partner app
         </div>
         <div className="text-xs text-brand-green/85 mt-0.5">
           Rings loudly for every new order — even when the app is closed.
@@ -67,7 +67,7 @@ export function DownloadProviderApp() {
         </div>
       </div>
       <a
-        href="/sarvopakar.apk"
+        href="/sarvopakar-provider.apk"
         download
         className="shrink-0 inline-flex items-center gap-1.5 bg-brand-green text-white text-xs font-bold px-3 py-2 rounded-md hover:bg-brand-green/90"
       >
