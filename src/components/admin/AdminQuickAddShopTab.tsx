@@ -26,7 +26,16 @@ const LocationPicker = dynamic(
  * Required: name, category, phone, map pin. Everything else optional.
  * Shops created here go live immediately (backend auto-approves them).
  */
-export default function AdminQuickAddShopTab() {
+/**
+ * Reusable quick-add form. By default submits via the admin API; pass
+ * `submitFn` to reuse the exact same form for other onboarding flows
+ * (e.g. the /agent field-agent page).
+ */
+export default function AdminQuickAddShopTab({
+  submitFn,
+}: {
+  submitFn?: typeof quickCreateShop;
+} = {}) {
   const [categories, setCategories] = useState<Category[]>([]);
 
   const [name, setName] = useState('');
@@ -88,7 +97,7 @@ export default function AdminQuickAddShopTab() {
 
     setSaving(true);
     try {
-      const { shop, reusedExistingAccount } = await quickCreateShop({
+      const { shop, reusedExistingAccount } = await (submitFn || quickCreateShop)({
         name: name.trim(),
         category,
         phone: phone.trim(),
