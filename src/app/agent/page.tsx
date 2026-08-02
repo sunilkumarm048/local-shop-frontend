@@ -69,7 +69,14 @@ export default function AgentPage() {
         setChecking(false);
         return setError('Agent onboarding is not enabled yet. Contact the admin.');
       }
-      // any other error (validation) = code accepted
+      if (!(e instanceof ApiError && e.status === 400)) {
+        // Anything other than a validation error (e.g. 404 route missing,
+        // network down) means the server side isn't ready — don't let the
+        // agent in to hit a wall at save time.
+        setChecking(false);
+        return setError('Cannot reach the onboarding service. Try again later or contact the admin.');
+      }
+      // 400 validation error = the code was accepted
     }
     saveAgentSession(c, n);
     setSession({ code: c, name: n });
