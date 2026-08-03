@@ -60,6 +60,26 @@ export async function api<T = unknown>(path: string, options: ReqOptions = {}): 
   const parsed = isJson ? await res.json().catch(() => null) : await res.text();
 
   if (!res.ok) {
+    // Global expired-session handling: a 401 on an AUTHENTICATED request means
+    // the stored JWT is dead (expired/invalidated). Instead of letting the
+    // error crash into the "Something went wrong" boundary, clear the session
+    // and send the user to login with a return path. Guards: only when a token
+    // was actually sent (so wrong-password 401s on /login still surface
+    // normally), only in the browser, and never while already on /login.
+    if (res.status === 401 && token && typeof window !== 'undefined') {
+      const path = window.location.pathname;
+      if (!path.startsWith('/login')) {
+        try {
+          const { useAuth } = await import('@/stores/auth');
+          useAuth.getState().clear();
+        } catch {
+          /* store unavailable — still redirect */
+        }
+        window.location.replace(`/login?next=${encodeURIComponent(path)}`);
+        // Halt the caller quietly; the page is navigating away.
+        await new Promise(() => {});
+      }
+    }
     const msg =
       (isJson && (parsed as { error?: string })?.error) ||
       `Request failed with status ${res.status}`;
