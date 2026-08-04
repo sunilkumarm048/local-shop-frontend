@@ -10,23 +10,35 @@ import { useEffect, useState } from 'react';
 import { ChevronDown, ChevronUp, Loader2, Check, CalendarCog } from 'lucide-react';
 
 import { updateShop } from '@/lib/owner';
+import type { Shop } from '@/lib/shops';
 import type { SlotConfig } from '@/lib/booking';
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const DURATIONS = [30, 45, 60, 90, 120];
 
+const SERVICE_MODES = [
+  { value: 'visit_customer', label: 'I go to the customer', hint: 'Plumber, repair, home service' },
+  { value: 'customer_visits', label: 'Customer comes to me', hint: 'Salon, parlour, studio' },
+  { value: 'both', label: 'Both', hint: 'Customer chooses while booking' },
+] as const;
+
 export function SlotSettingsCard({
   shopId,
   initial,
+  initialServiceMode,
 }: {
   shopId: string;
   initial?: SlotConfig;
+  initialServiceMode?: Shop['serviceMode'];
 }) {
   const [open, setOpen] = useState(false);
   const [slotMinutes, setSlotMinutes] = useState(60);
   const [start, setStart] = useState('09:00');
   const [end, setEnd] = useState('18:00');
   const [daysOff, setDaysOff] = useState<number[]>([]);
+  const [serviceMode, setServiceMode] = useState<'visit_customer' | 'customer_visits' | 'both'>(
+    'visit_customer'
+  );
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -39,6 +51,10 @@ export function SlotSettingsCard({
     if (initial.daysOff) setDaysOff(initial.daysOff);
   }, [initial]);
 
+  useEffect(() => {
+    if (initialServiceMode) setServiceMode(initialServiceMode);
+  }, [initialServiceMode]);
+
   function toggleDay(d: number) {
     setDaysOff((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]));
   }
@@ -49,6 +65,7 @@ export function SlotSettingsCard({
     setSaved(false);
     try {
       await updateShop(shopId, {
+        serviceMode,
         slotConfig: { slotMinutes, start, end, daysOff },
       } as Parameters<typeof updateShop>[1]);
       setSaved(true);
@@ -79,6 +96,31 @@ export function SlotSettingsCard({
             Customers can only book the free slots inside these hours. Booked
             slots show as unavailable automatically.
           </p>
+
+          <div>
+            <div className="text-xs font-bold mb-1.5">Service type — who travels?</div>
+            <div className="space-y-1.5">
+              {SERVICE_MODES.map((m) => (
+                <button
+                  key={m.value}
+                  type="button"
+                  onClick={() => setServiceMode(m.value)}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-lg border text-left ${
+                    serviceMode === m.value
+                      ? 'bg-primary/10 border-primary'
+                      : 'bg-card border-border hover:bg-muted'
+                  }`}
+                >
+                  <span className="text-xs font-semibold">{m.label}</span>
+                  <span className="text-[10px] text-muted-foreground">{m.hint}</span>
+                </button>
+              ))}
+            </div>
+            <p className="text-[11px] text-muted-foreground mt-1.5">
+              &quot;Customer comes to me&quot; removes the address step for customers and shows
+              them directions to your shop instead.
+            </p>
+          </div>
 
           <div>
             <div className="text-xs font-bold mb-1.5">Slot length</div>
