@@ -205,21 +205,10 @@ export default function BookServicePage() {
     );
   }
 
-  // Provider is on an active job — don't allow a new booking.
-  if (shop.busy) {
-    return (
-      <div className="container max-w-lg py-10 text-center space-y-3">
-        <p className="text-sm font-medium">{shop.name} is currently on a job.</p>
-        <p className="text-sm text-muted-foreground">
-          They aren&apos;t taking new bookings right now. You can still call them, or check
-          back once they&apos;re free.
-        </p>
-        <Button variant="outline" onClick={() => router.back()}>
-          Go back
-        </Button>
-      </div>
-    );
-  }
+  // NOTE: a busy provider no longer blocks this page. "Busy" only means they
+  // can't come RIGHT NOW — future slots are exactly what the slot system is
+  // for. The "As soon as possible" option is disabled below instead, matching
+  // the backend guard (which rejects only requestNow while busy).
 
   if (done) {
     return (
@@ -289,6 +278,12 @@ export default function BookServicePage() {
       {/* When */}
       <div className="space-y-2">
         <Label>When?</Label>
+        {shop.busy && (
+          <div className="rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs font-medium px-3 py-2">
+            {shop.name} is on a job right now — &quot;as soon as possible&quot; is unavailable,
+            but you can book any free slot below.
+          </div>
+        )}
         <div className="flex gap-2">
           <button
             type="button"
@@ -303,11 +298,15 @@ export default function BookServicePage() {
           </button>
           <button
             type="button"
+            disabled={shop.busy}
             onClick={() => setWhen('now')}
+            title={shop.busy ? 'Provider is on a job right now' : undefined}
             className={`flex-1 h-9 rounded-md text-sm font-medium border transition-colors ${
               when === 'now'
                 ? 'bg-primary text-primary-foreground border-primary'
-                : 'bg-card border-border hover:bg-muted'
+                : shop.busy
+                  ? 'bg-muted/60 border-border text-muted-foreground cursor-not-allowed line-through'
+                  : 'bg-card border-border hover:bg-muted'
             }`}
           >
             As soon as possible
