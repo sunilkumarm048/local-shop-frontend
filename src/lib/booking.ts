@@ -12,6 +12,7 @@ export type BookingStatus =
   | 'cancelled';
 
 export interface Booking {
+  visitType?: 'provider_visits' | 'customer_visits';
   _id: string;
   customer:
     | string
@@ -50,6 +51,7 @@ export interface Booking {
 }
 
 export interface CreateBookingInput {
+  atShop?: boolean;
   providerId: string;
   serviceName: string;
   serviceCategory?: string;
