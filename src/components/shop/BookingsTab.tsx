@@ -10,8 +10,7 @@ import {
   Calendar,
   Navigation,
   Check,
-  X,
-} from 'lucide-react';
+  X, Store, } from 'lucide-react';
 
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -218,7 +217,13 @@ export function BookingsTab({ shop }: { shop?: Shop }) {
         subline="Even when the app is closed or your phone is locked. Recommended for providers."
       />
 
-      {shop?._id && <SlotSettingsCard shopId={shop._id} initial={shop.slotConfig} />}
+      {shop?._id && (
+        <SlotSettingsCard
+          shopId={shop._id}
+          initial={shop.slotConfig}
+          initialServiceMode={shop.serviceMode}
+        />
+      )}
 
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <h2 className="text-lg font-semibold">Service bookings</h2>
@@ -293,7 +298,10 @@ function BookingCard({
 }) {
   const cust =
     typeof booking.customer === 'object' && booking.customer ? booking.customer : null;
-  const addr = booking.address;
+  // When the customer comes to the shop there is no customer address to
+  // navigate to — suppress address, distance and Directions entirely.
+  const customerComes = booking.visitType === 'customer_visits';
+  const addr = customerComes ? undefined : booking.address;
   const addrLine = addr
     ? [addr.line1, addr.line2, addr.city, addr.pincode].filter(Boolean).join(', ')
     : '';
@@ -348,6 +356,12 @@ function BookingCard({
               <a href={`tel:${booking.contactPhone || cust?.phone}`} className="text-primary">
                 {booking.contactPhone || cust?.phone}
               </a>
+            </p>
+          )}
+          {customerComes && (
+            <p className="flex items-center gap-1.5 font-medium text-brand-green">
+              <Store className="h-3.5 w-3.5 shrink-0" />
+              Customer will come to your shop
             </p>
           )}
           {addrLine && (
