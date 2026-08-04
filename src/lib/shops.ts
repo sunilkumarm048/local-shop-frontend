@@ -13,6 +13,7 @@ export interface Shop {
   isService?: boolean;
   /** Service providers: currently available for home visits. */
   availableNow?: boolean;
+  serviceMode?: 'visit_customer' | 'customer_visits' | 'both';
   slotConfig?: {
     slotMinutes?: number;
     start?: string;
