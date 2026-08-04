@@ -7,9 +7,10 @@ import Link from 'next/link' ;
 import {
   Loader2,
   ArrowLeft,
-  CalendarPlus ,
+  CalendarPlus,
   Check,
   Store,
+  Navigation,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -75,6 +76,11 @@ export default function BookServicePage() {
   const [contactName, setContactName] = useState('');
   const [contactPhone, setContactPhone] = useState('');
   const [addressLine, setAddressLine] = useState('');
+  // For providers serving "both" ways: customer's choice to go to the shop.
+  const [atShop, setAtShop] = useState(false);
+  const serviceMode = shop?.serviceMode || 'visit_customer';
+  // Does the CUSTOMER travel for this booking?
+  const customerVisits = serviceMode === 'customer_visits' || (serviceMode === 'both' && atShop);
   const [pin, setPin] = useState<LatLng | null>(null);
   const [notes, setNotes] = useState('');
 
@@ -133,6 +139,10 @@ export default function BookServicePage() {
       setError('Pick a date and a time slot.');
       return;
     }
+    if (!customerVisits && !pin && !user?.addresses?.length && !addressLine.trim()) {
+      setError('Add your address or pin your location so the provider knows where to come.');
+      return;
+    }
     setSubmitting(true);
     try {
       const firstAddr = user?.addresses?.[0];
@@ -173,7 +183,8 @@ export default function BookServicePage() {
         contactName: contactName.trim() || undefined,
         contactPhone: contactPhone.trim() || undefined,
         notes: notes.trim() || undefined,
-        address,
+        atShop: customerVisits || undefined,
+        address: customerVisits ? undefined : address,
       });
       setDone(true);
     } catch (err) {
@@ -349,6 +360,62 @@ export default function BookServicePage() {
           />
         </div>
       </div>
+      {serviceMode === 'both' && (
+        <div className="space-y-2">
+          <Label>Where should the service happen?</Label>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setAtShop(false)}
+              className={`flex-1 h-9 rounded-md text-sm font-medium border transition-colors ${
+                !atShop
+                  ? 'bg-primary text-primary-foreground border-primary'
+                  : 'bg-card border-border hover:bg-muted'
+              }`}
+            >
+              At my address
+            </button>
+            <button
+              type="button"
+              onClick={() => setAtShop(true)}
+              className={`flex-1 h-9 rounded-md text-sm font-medium border transition-colors ${
+                atShop
+                  ? 'bg-primary text-primary-foreground border-primary'
+                  : 'bg-card border-border hover:bg-muted'
+              }`}
+            >
+              I&apos;ll visit the shop
+            </button>
+          </div>
+        </div>
+      )}
+
+      {customerVisits ? (
+        <div className="rounded-xl border border-brand-green/30 bg-brand-greenLight/40 p-4 space-y-1.5">
+          <div className="font-bold text-sm">You&apos;ll visit {shop?.name}</div>
+          {(shop?.address?.line1 || shop?.address?.city) && (
+            <div className="text-sm text-muted-foreground">
+              {[shop?.address?.line1, shop?.address?.city, shop?.address?.pincode]
+                .filter(Boolean)
+                .join(', ')}
+            </div>
+          )}
+          {shop?.location?.coordinates && (
+            <a
+              href={`https://www.google.com/maps/dir/?api=1&destination=${shop.location.coordinates[1]},${shop.location.coordinates[0]}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand-green hover:underline"
+            >
+              <Navigation className="h-4 w-4" /> Get directions to the shop
+            </a>
+          )}
+          <p className="text-[11px] text-muted-foreground">
+            No address needed — just reach the shop at your booked time.
+          </p>
+        </div>
+      ) : (
+        <>
       <div>
         <Label htmlFor="addr">Address</Label>
         <Input
@@ -387,6 +454,8 @@ export default function BookServicePage() {
           </p>
         )}
       </div>
+        </>
+      )}
 
       <div>
         <Label htmlFor="notes">Notes (optional)</Label>
