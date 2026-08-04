@@ -12,8 +12,7 @@ import {
   Check,
   X,
   CalendarPlus,
-  Star,
-} from 'lucide-react';
+  Star, Navigation } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -273,6 +272,17 @@ function BookingTracker({
             >
               <Phone className="h-3.5 w-3.5" />
               Call provider
+            </a>
+          )}
+          {booking.visitType === 'customer_visits' && provider?.location?.coordinates && (
+            <a
+              href={`https://www.google.com/maps/dir/?api=1&destination=${provider.location.coordinates[1]},${provider.location.coordinates[0]}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-input text-xs font-medium hover:bg-accent"
+            >
+              <Navigation className="h-3.5 w-3.5" />
+              Shop directions
             </a>
           )}
           {['requested', 'accepted', 'scheduled'].includes(booking.status) && (
