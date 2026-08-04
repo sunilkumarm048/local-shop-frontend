@@ -41,6 +41,7 @@ export interface CreateShopPayload {
 
 export type UpdateShopPayload = Partial<CreateShopPayload> & {
   isOpen?: boolean;
+  serviceMode?: 'visit_customer' | 'customer_visits' | 'both';
   slotConfig?: {
     slotMinutes?: number;
     start?: string;
@@ -67,6 +68,7 @@ export async function createShop(payload: CreateShopPayload) {
  * Goes live immediately. Returns the new shop + the placeholder owner id.
  */
 export async function quickCreateShop(payload: {
+  documents?: { url: string; label?: string }[];
   name: string;
   category: string;
   phone: string;
