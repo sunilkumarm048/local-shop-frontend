@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Minus, Plus, ArrowLeft, ImageIcon, Zap, Phone, Navigation } from 'lucide-react';
+import { Minus, Plus, ArrowLeft, ImageIcon, Zap, Phone, Navigation, CalendarCheck } from 'lucide-react';
 import Link from 'next/link';
 
 import { Button } from '@/components/ui/button';
@@ -114,13 +114,37 @@ export default function ShopDetailClient({ id }: Props) {
 
       <ShopGallery photos={shop.gallery || []} />
 
-      {products.length === 0 ? (
-        <div className="text-center py-12 text-muted-foreground text-sm">
-          This shop doesn&apos;t sell items online.
-          <br />
-          Use <span className="font-semibold text-foreground">Call</span> or{' '}
-          <span className="font-semibold text-foreground">Directions</span> above to reach them.
+      {/* Service providers (parlour, AC repair, photographer, …) get the
+          booking flow no matter how the customer arrived at this page —
+          Services tab, Shop tab, or a shared link. */}
+      {shop.isService && (
+        <div className="rounded-xl border border-brand-green/30 bg-brand-greenLight/40 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="flex-1">
+            <div className="font-bold text-base flex items-center gap-2">
+              <CalendarCheck className="h-5 w-5 text-brand-green" />
+              Book an appointment online
+            </div>
+            <div className="text-sm text-muted-foreground mt-0.5">
+              Pick a free time slot — confirmed instantly, no waiting at the {shop.name.split(' ')[0]} counter.
+            </div>
+          </div>
+          <Button asChild size="lg" className="sm:w-auto w-full">
+            <Link href={`/customer/book/${shop._id}`}>
+              <CalendarCheck className="h-4 w-4 mr-1.5" /> Book a service
+            </Link>
+          </Button>
         </div>
+      )}
+
+      {products.length === 0 ? (
+        shop.isService ? null : (
+          <div className="text-center py-12 text-muted-foreground text-sm">
+            This shop doesn&apos;t sell items online.
+            <br />
+            Use <span className="font-semibold text-foreground">Call</span> or{' '}
+            <span className="font-semibold text-foreground">Directions</span> above to reach them.
+          </div>
+        )
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
           {products.map((p) => {
