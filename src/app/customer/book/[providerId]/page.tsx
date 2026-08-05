@@ -11,6 +11,7 @@ import {
   Check,
   Store,
   Navigation,
+  Phone,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -229,9 +230,32 @@ export default function BookServicePage() {
         </div>
         <h1 className="text-xl font-semibold">Request sent</h1>
         <p className="text-sm text-muted-foreground leading-relaxed">
-          Your request for “{serviceName}” was sent to {shop.name}. They&apos;ll confirm a
-          time, then come to your address. You can track it under My Bookings.
+          {customerVisits
+            ? `Your request for “${serviceName}” was sent to ${shop.name}. Once they confirm, just reach the shop at your booked time.`
+            : `Your request for “${serviceName}” was sent to ${shop.name}. They'll confirm a time, then come to your address. You can track it under My Bookings.`}
         </p>
+        {customerVisits && (
+          <div className="flex gap-2 justify-center">
+            {shop.location?.coordinates && (
+              <Button asChild variant="outline">
+                <a
+                  href={`https://www.google.com/maps/dir/?api=1&destination=${shop.location.coordinates[1]},${shop.location.coordinates[0]}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <Navigation className="h-4 w-4 mr-1.5" /> Directions to shop
+                </a>
+              </Button>
+            )}
+            {shop.phone && (
+              <Button asChild variant="outline">
+                <a href={`tel:${shop.phone}`}>
+                  <Phone className="h-4 w-4 mr-1.5" /> Call shop
+                </a>
+              </Button>
+            )}
+          </div>
+        )}
         <div className="flex gap-2 justify-center pt-2">
           <Button variant="outline" asChild>
             <Link href="/customer">Back to home</Link>
@@ -400,18 +424,9 @@ export default function BookServicePage() {
                 .join(', ')}
             </div>
           )}
-          {shop?.location?.coordinates && (
-            <a
-              href={`https://www.google.com/maps/dir/?api=1&destination=${shop.location.coordinates[1]},${shop.location.coordinates[0]}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand-green hover:underline"
-            >
-              <Navigation className="h-4 w-4" /> Get directions to the shop
-            </a>
-          )}
           <p className="text-[11px] text-muted-foreground">
-            No address needed — just reach the shop at your booked time.
+            No address needed — directions and the shop&apos;s number appear after
+            your request is sent.
           </p>
         </div>
       ) : (
