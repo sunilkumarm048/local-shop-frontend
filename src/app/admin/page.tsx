@@ -21,7 +21,7 @@ import {
   PackagePlus,
   QrCode,
   Settings,
-} from 'lucide-react';
+  Database, } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/stores/auth';
@@ -30,6 +30,7 @@ import { logout } from '@/lib/auth';
 
 import { AdminOverviewTab } from '@/components/admin/AdminOverviewTab';
 import { AdminShopsTab } from '@/components/admin/AdminShopsTab';
+import { AdminDataTab } from '@/components/admin/AdminDataTab';
 import AdminQuickAddShopTab from '@/components/admin/AdminQuickAddShopTab';
 import { AdminUsersTab } from '@/components/admin/AdminUsersTab';
 import { AdminOrdersTab } from '@/components/admin/AdminOrdersTab';
@@ -56,6 +57,7 @@ type Section =
   | 'withdrawals'
   | 'discounts'
   | 'products'
+  | 'data'
   | 'verifications'
   | 'templates'
   | 'qrcodes'
@@ -133,6 +135,7 @@ export default function AdminDashboard() {
           {section === 'withdrawals' && <AdminWithdrawalsTab />}
           {section === 'discounts' && <AdminShopDiscountsTab />}
           {section === 'products' && <AdminManageProductsTab />}
+          {section === 'data' && <AdminDataTab />}
           {section === 'verifications' && <AdminDocVerificationTab />}
           {section === 'templates' && <AdminTemplatesTab />}
           {section === 'qrcodes' && <AdminQrCodesTab />}
@@ -160,6 +163,7 @@ function SectionNav({ current, onChange }: NavProps) {
     { id: 'pricing', label: 'Pricing', icon: IndianRupee },
     { id: 'discounts', label: 'Discounts', icon: Percent },
     { id: 'products', label: 'Products', icon: Package },
+    { id: 'data', label: 'Data', icon: Database },
     { id: 'withdrawals', label: 'Withdrawals', icon: Banknote },
     { id: 'verifications', label: 'Verifications', icon: ShieldCheck },
     { id: 'templates', label: 'Templates', icon: PackagePlus },
