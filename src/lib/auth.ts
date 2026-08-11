@@ -29,12 +29,29 @@ export async function registerWithEmail(input: {
   phone?: string;
   role?: 'customer' | 'shop' | 'delivery';
 }) {
-  const res = await api<AuthResponse>('/auth/register', {
+  // New accounts must verify their email first: the server answers
+  // { requiresVerification, email } and the UI moves to the code screen.
+  const res = await api<{ requiresVerification: boolean; email: string }>('/auth/register', {
     method: 'POST',
     body: input,
   });
+  return res;
+}
+
+export async function verifySignupEmail(email: string, code: string) {
+  const res = await api<AuthResponse>('/auth/verify-email', {
+    method: 'POST',
+    body: { email, code },
+  });
   useAuth.getState().setAuth(res.user, res.token);
   return res;
+}
+
+export async function resendVerification(email: string) {
+  return api<{ ok: boolean }>('/auth/resend-verification', {
+    method: 'POST',
+    body: { email },
+  });
 }
 
 export async function sendOtp(phone: string) {
