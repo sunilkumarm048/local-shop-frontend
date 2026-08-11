@@ -115,6 +115,43 @@ export function PushSetup({ headline, subline, className }: Props) {
           Test notification
         </button>
         <span className="opacity-80">· App alerts active</span>
+        <span className="opacity-50">·</span>
+        <button
+          onClick={() => {
+            // Phone-setup helpers: Android forbids flipping these switches
+            // silently, so we deep-link the provider to the exact screens.
+            const DS = (
+              window as unknown as {
+                Capacitor?: { Plugins?: { DeviceSettings?: {
+                  requestIgnoreBatteryOptimizations: () => Promise<{ already?: boolean }>;
+                  openNotificationSettings: () => Promise<void>;
+                  openOtherPermissions: () => Promise<void>;
+                } } };
+              }
+            ).Capacitor?.Plugins?.DeviceSettings;
+            if (!DS) return;
+            // Chain the three screens with confirmations so the provider is
+            // guided, not dumped: battery (a real grant dialog) → sound
+            // channel → MIUI lock-screen/background toggles.
+            DS.requestIgnoreBatteryOptimizations()
+              .catch(() => ({}))
+              .then(() => {
+                if (window.confirm('Step 2/3 — Notification sound:\nTap "New order alerts" → check Sound is ON.')) {
+                  return DS.openNotificationSettings();
+                }
+              })
+              .then(() => {
+                if (window.confirm('Step 3/3 — Lock screen (MI phones):\nTurn ON "Show on Lock screen" and "Open new windows while running in the background".')) {
+                  return DS.openOtherPermissions();
+                }
+              })
+              .catch(() => {});
+          }}
+          className="text-brand-green font-semibold hover:underline"
+          title="Battery, sound & lock-screen settings for reliable alerts"
+        >
+          Phone setup
+        </button>
         {error && <span className="text-destructive ml-2">{error}</span>}
       </div>
     );
