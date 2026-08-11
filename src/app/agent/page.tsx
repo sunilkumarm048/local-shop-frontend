@@ -19,6 +19,7 @@ import {
   saveAgentSession,
   clearAgentSession,
   makeAgentQuickCreate,
+  makeAgentSendEmailOtp,
 } from '@/lib/agent';
 import { ApiError } from '@/lib/api';
 
@@ -38,6 +39,10 @@ export default function AgentPage() {
 
   const submitFn = useMemo(
     () => (session ? makeAgentQuickCreate(session.code, session.name) : undefined),
+    [session]
+  );
+  const sendEmailOtp = useMemo(
+    () => (session ? makeAgentSendEmailOtp(session.code) : undefined),
     [session]
   );
 
@@ -173,7 +178,7 @@ export default function AgentPage() {
       </header>
 
       <div className="container py-6 max-w-2xl">
-        <AdminQuickAddShopTab submitFn={submitFn} />
+        <AdminQuickAddShopTab submitFn={submitFn} sendEmailOtp={sendEmailOtp} />
       </div>
     </main>
   );
