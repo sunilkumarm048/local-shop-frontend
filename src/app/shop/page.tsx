@@ -134,27 +134,42 @@ export default function ShopDashboard() {
     ).Capacitor?.Plugins?.BackgroundGeolocation;
 
     if (BG) {
-      let watcherId: string | null = null;
-      let cancelled = false;
-      BG.addWatcher(
-        {
-          backgroundTitle: 'Sarvopakar — you are online',
-          backgroundMessage: 'Sharing your live location with nearby customers',
-          requestPermissions: true,
-          stale: false,
-          distanceFilter: MIN_MOVE_METERS,
-        },
-        (loc) => {
-          if (loc) maybeSend(loc.latitude, loc.longitude);
-        }
-      ).then((id) => {
-        if (cancelled) BG.removeWatcher({ id }).catch(() => {});
-        else watcherId = id;
-      });
-      return () => {
-        cancelled = true;
-        if (watcherId) BG.removeWatcher({ id: watcherId }).catch(() => {});
-      };
+      // Defensive: whatever the plugin bridge does on a given device/ROM,
+      // live-location must never crash the dashboard. Any failure here falls
+      // through to the plain web watcher below.
+      try {
+        let watcherId: string | null = null;
+        let cancelled = false;
+        BG.addWatcher(
+          {
+            backgroundTitle: 'Sarvopakar — you are online',
+            backgroundMessage: 'Sharing your live location with nearby customers',
+            requestPermissions: true,
+            stale: false,
+            distanceFilter: MIN_MOVE_METERS,
+          },
+          (loc) => {
+            try {
+              if (loc) maybeSend(loc.latitude, loc.longitude);
+            } catch {
+              /* never let a single ping kill the watcher */
+            }
+          }
+        )
+          .then((id) => {
+            if (cancelled) BG.removeWatcher({ id }).catch(() => {});
+            else watcherId = id;
+          })
+          .catch(() => {
+            /* permission refused / plugin error — background mode just off */
+          });
+        return () => {
+          cancelled = true;
+          if (watcherId) BG.removeWatcher({ id: watcherId }).catch(() => {});
+        };
+      } catch {
+        // fall through to the web watcher
+      }
     }
 
     // ---- Web fallback: foreground-only tracking while the tab is visible.
