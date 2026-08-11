@@ -136,7 +136,7 @@ export default function AdminQuickAddShopTab({
           <Store className="h-5 w-5" /> Quick add shop
         </h2>
         <p className="text-sm text-muted-foreground">
-          List a shop on the owner’s behalf. Goes live immediately. The map pin
+          List a shop on the owner’s behalf. Admin-created shops go live immediately; agent registrations go live after Sarvopakar review. The map pin
           and city are kept after saving so you can add nearby shops quickly.
         </p>
       </div>
