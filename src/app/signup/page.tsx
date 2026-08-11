@@ -52,17 +52,15 @@ export default function SignupPage() {
   const onSubmit = form.handleSubmit(async (data) => {
     setServerError(null);
     try {
-      const { user } = await registerWithEmail({
+      const res = await registerWithEmail({
         name: data.name,
         email: data.email,
         phone: data.phone || undefined,
         password: data.password,
         role: data.role,
       });
-
-      if (user.roles.includes('shop')) router.push('/shop');
-      else if (user.roles.includes('delivery')) router.push('/delivery');
-      else router.push('/customer');
+      // Account created — now prove the email is real.
+      router.push(`/verify-email?email=${encodeURIComponent(res.email)}`);
     } catch (err) {
       setServerError(err instanceof ApiError ? err.message : 'Signup failed');
     }
