@@ -31,6 +31,12 @@ export default function Error({
         We hit a snag loading this page. It might be a temporary hiccup — try
         again in a moment.
       </p>
+      {/* The actual error, small and grey — turns any user screenshot into a
+          precise bug report instead of a guessing game. */}
+      <p className="text-[11px] text-muted-foreground/70 font-mono max-w-sm break-all">
+        {error?.message || 'Unknown error'}
+        {error?.digest ? ` · ${error.digest}` : ''}
+      </p>
       <div className="flex gap-3 mt-2">
         <Button onClick={reset}>Try again</Button>
         <Button variant="outline" onClick={() => (window.location.href = '/')}>
