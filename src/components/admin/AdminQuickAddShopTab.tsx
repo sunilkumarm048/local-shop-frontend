@@ -33,8 +33,12 @@ const LocationPicker = dynamic(
  */
 export default function AdminQuickAddShopTab({
   submitFn,
+  sendEmailOtp,
 }: {
   submitFn?: typeof quickCreateShop;
+  /** When provided (agent flow): a 6-digit code is emailed to the owner and
+      must be entered before the form submits — proves the inbox is real. */
+  sendEmailOtp?: (email: string) => Promise<void>;
 } = {}) {
   const [categories, setCategories] = useState<Category[]>([]);
 
@@ -42,6 +46,8 @@ export default function AdminQuickAddShopTab({
   const [category, setCategory] = useState('');
   const [phone, setPhone] = useState('');
   const [ownerEmail, setOwnerEmail] = useState('');
+  const [emailOtp, setEmailOtp] = useState('');
+  const [otpState, setOtpState] = useState<'idle' | 'sending' | 'sent'>('idle');
   const [ownerPassword, setOwnerPassword] = useState('');
   const [description, setDescription] = useState('');
   const [logo, setLogo] = useState('');
@@ -92,6 +98,8 @@ export default function AdminQuickAddShopTab({
     if (!category) return setError('Pick a category.');
     if (phone.trim().length < 6) return setError('Enter a phone number.');
     if (!/\S+@\S+\.\S+/.test(ownerEmail)) return setError("Enter the owner's login email.");
+    if (sendEmailOtp && emailOtp.trim().length !== 6)
+      return setError('Enter the 6-digit code sent to the owner\'s email.');
     if (ownerPassword.length < 6) return setError('Password must be at least 6 characters.');
     if (!location) return setError('Drop a pin on the map for the shop location.');
 
@@ -102,6 +110,7 @@ export default function AdminQuickAddShopTab({
         category,
         phone: phone.trim(),
         ownerEmail: ownerEmail.trim(),
+        ...(sendEmailOtp ? { emailOtp: emailOtp.trim() } : {}),
         ownerPassword,
         description: description.trim() || undefined,
         logo: logo || undefined,
@@ -217,6 +226,42 @@ export default function AdminQuickAddShopTab({
                 inputMode="email"
               />
             </Field>
+            {sendEmailOtp && (
+              <div className="space-y-1.5">
+                <div className="flex gap-2">
+                  <input
+                    className="input-base flex-1 tracking-widest font-semibold"
+                    value={emailOtp}
+                    onChange={(e) => setEmailOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="6-digit email code"
+                    inputMode="numeric"
+                  />
+                  <button
+                    type="button"
+                    disabled={otpState === 'sending' || !/\S+@\S+\.\S+/.test(ownerEmail)}
+                    onClick={async () => {
+                      setOtpState('sending');
+                      setError(null);
+                      try {
+                        await sendEmailOtp(ownerEmail.trim());
+                        setOtpState('sent');
+                      } catch {
+                        setOtpState('idle');
+                        setError('Could not send the code — check the email address.');
+                      }
+                    }}
+                    className="px-3 rounded-md border border-primary text-primary text-xs font-semibold hover:bg-primary/10 disabled:opacity-50"
+                  >
+                    {otpState === 'sending' ? 'Sending…' : otpState === 'sent' ? 'Resend code' : 'Send code'}
+                  </button>
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  {otpState === 'sent'
+                    ? 'Code sent ✓ — ask the owner to check their email (and spam) on their phone.'
+                    : 'A 6-digit code goes to this email — the owner reads it out, you type it here. Confirms the email is real.'}
+                </p>
+              </div>
+            )}
             <Field label="Temporary password *">
               <input
                 className="input-base"
