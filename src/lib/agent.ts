@@ -48,3 +48,15 @@ export function makeAgentQuickCreate(code: string, agentName: string): typeof qu
       body: { ...payload, agentName },
     });
 }
+
+
+/** Send the counter-verification code to the owner's email (agent flow). */
+export function makeAgentSendEmailOtp(code: string) {
+  return async (email: string) => {
+    await api<{ ok: boolean }>('/agent/send-email-otp', {
+      method: 'POST',
+      headers: { 'x-agent-code': code },
+      body: { email },
+    });
+  };
+}
