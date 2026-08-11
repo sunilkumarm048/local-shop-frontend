@@ -77,6 +77,14 @@ export default function LoginPage() {
       const { user } = await loginWithEmail(data.email, data.password);
       routeAfterLogin(user);
     } catch (err) {
+      if (
+        err instanceof ApiError &&
+        (err.body as { code?: string } | null)?.code === 'EMAIL_NOT_VERIFIED'
+      ) {
+        // Fresh code was already emailed by the server — go straight there.
+        router.push(`/verify-email?email=${encodeURIComponent(data.email)}`);
+        return;
+      }
       setServerError(err instanceof ApiError ? err.message : 'Login failed');
     }
   });
