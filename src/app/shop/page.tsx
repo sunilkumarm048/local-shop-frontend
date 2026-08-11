@@ -84,17 +84,12 @@ export default function ShopDashboard() {
   const liveShop = shops?.[0];
   useEffect(() => {
     if (!liveShop?.isService || !liveShop.availableNow) return;
-    if (typeof navigator === 'undefined' || !navigator.geolocation) return;
 
-    // watchPosition keeps the GPS chip locked on, so the fix keeps refining —
-    // far more pinpoint than a cold getCurrentPosition every 20s. The device
-    // reports roughly every second; we upload when the provider has MOVED
-    // (≥15 m) or as a ~10s heartbeat, with a 4s floor so the free-tier
-    // backend isn't hammered. Net effect for customers: live, accurate pin.
+    // Shared throttle: upload when moved ≥15 m or every ~10 s heartbeat, with
+    // a 4 s floor so the free-tier backend isn't hammered.
     const MIN_UPLOAD_GAP_MS = 4_000;
     const HEARTBEAT_MS = 10_000;
     const MIN_MOVE_METERS = 15;
-
     let lastSent = 0;
     let lastLat = 0;
     let lastLng = 0;
@@ -109,26 +104,71 @@ export default function ShopDashboard() {
       return 2 * R * Math.asin(Math.sqrt(s));
     };
 
+    const maybeSend = (latitude: number, longitude: number) => {
+      const now = Date.now();
+      const gap = now - lastSent;
+      if (gap < MIN_UPLOAD_GAP_MS) return;
+      const moved =
+        lastSent === 0 || metersBetween(lastLat, lastLng, latitude, longitude) >= MIN_MOVE_METERS;
+      if (!moved && gap < HEARTBEAT_MS) return;
+      lastSent = now;
+      lastLat = latitude;
+      lastLng = longitude;
+      pingShopLocation(liveShop._id, latitude, longitude).catch(() => {});
+    };
+
+    // ---- Native app: background tracking via a location foreground service.
+    // Keeps reporting while the app is minimized or the screen is off (the
+    // persistent notification is Android's requirement for that). Toggling
+    // AVAILABLE off tears the watcher down and removes the notification.
+    const BG = (
+      window as unknown as {
+        Capacitor?: { Plugins?: { BackgroundGeolocation?: {
+          addWatcher: (
+            opts: Record<string, unknown>,
+            cb: (loc?: { latitude: number; longitude: number }, err?: unknown) => void
+          ) => Promise<string>;
+          removeWatcher: (opts: { id: string }) => Promise<void>;
+        } } };
+      }
+    ).Capacitor?.Plugins?.BackgroundGeolocation;
+
+    if (BG) {
+      let watcherId: string | null = null;
+      let cancelled = false;
+      BG.addWatcher(
+        {
+          backgroundTitle: 'Sarvopakar — you are online',
+          backgroundMessage: 'Sharing your live location with nearby customers',
+          requestPermissions: true,
+          stale: false,
+          distanceFilter: MIN_MOVE_METERS,
+        },
+        (loc) => {
+          if (loc) maybeSend(loc.latitude, loc.longitude);
+        }
+      ).then((id) => {
+        if (cancelled) BG.removeWatcher({ id }).catch(() => {});
+        else watcherId = id;
+      });
+      return () => {
+        cancelled = true;
+        if (watcherId) BG.removeWatcher({ id: watcherId }).catch(() => {});
+      };
+    }
+
+    // ---- Web fallback: foreground-only tracking while the tab is visible.
+    if (typeof navigator === 'undefined' || !navigator.geolocation) return;
     const watchId = navigator.geolocation.watchPosition(
       (pos) => {
-        if (document.hidden) return; // app-open only (web can't background-track)
-        const { latitude, longitude } = pos.coords;
-        const now = Date.now();
-        const gap = now - lastSent;
-        if (gap < MIN_UPLOAD_GAP_MS) return;
-        const moved = lastSent === 0 || metersBetween(lastLat, lastLng, latitude, longitude) >= MIN_MOVE_METERS;
-        if (!moved && gap < HEARTBEAT_MS) return;
-        lastSent = now;
-        lastLat = latitude;
-        lastLng = longitude;
-        pingShopLocation(liveShop._id, latitude, longitude).catch(() => {});
+        if (document.hidden) return; // web can't background-track
+        maybeSend(pos.coords.latitude, pos.coords.longitude);
       },
       () => {
         /* permission denied / unavailable — silently skip */
       },
       { enableHighAccuracy: true, maximumAge: 1_000, timeout: 20_000 }
     );
-
     return () => navigator.geolocation.clearWatch(watchId);
   }, [liveShop?._id, liveShop?.isService, liveShop?.availableNow]);
 
